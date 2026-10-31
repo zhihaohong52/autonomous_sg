@@ -51,8 +51,12 @@ def _summary(fid: int) -> dict:
 @app.get("/api/config")
 def config():
     # v1 keys (web/index.html) merged with the v2 Config contract.
+    try:  # v1 disruptions.csv is excluded from the Docker image (.dockerignore)
+        n_disruptions = len(scenario.disruptions())
+    except OSError:
+        n_disruptions = 0
     v1 = {"jev_available": jev.available(), "model": negotiation.MODEL,
-          "policies": ["rule", "jev", "jev+claude", "llm"], "n_disruptions": len(scenario.disruptions())}
+          "policies": ["rule", "jev", "jev+claude", "llm"], "n_disruptions": n_disruptions}
     models, default_model = _models()
     return {**v1, "version": "2.0", "modes": MODES, "default_mode": _default_mode(), "models": models,
             "default_model": default_model,
@@ -200,7 +204,7 @@ def _models() -> tuple[list[dict], str]:
         rank[_model_id(_norm_model(arm["model"]))] = i + 1
     if winner:
         rank[_model_id(_norm_model(winner))] = 0
-    entries = [e for e in decide.DEFAULT_CHAIN if e != "formula"]
+    entries = [e for e in _default_chain() if e != "formula"]
     out = []
     for e in entries:
         provider = e.split(":", 1)[0] if ":" in e else "openrouter"
