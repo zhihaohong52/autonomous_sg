@@ -1,3 +1,5 @@
+> **SUPERSEDED.** This is the v1 single-flight evaluation (rule agents, one flight at a time). It is not comparable with the current 3-agent wave negotiation; see `eval/BENCHMARK.md` and README section 5.
+
 # Evaluation: 500 real disrupted flights (rule agents)
 
 Data: BTS on-time records 2023-2025 filtered to WEATHER_DELAY > 15 or LATE_AIRCRAFT_DELAY > 20 (11914 flights). Airport state around each flight is simulated (seeded per flight).

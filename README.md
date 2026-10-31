@@ -4,7 +4,7 @@ Design: `docs/superpowers/specs/2026-10-31-disruption-negotiator-design.md` · A
 
 ## 1. Pitch
 
-When weather or a late inbound disrupts an arrival, the airline duty manager coordinates by phone between the tower, the crew and ground handling. This prototype replaces those calls with exactly three agents: ATC, PILOT (for the focus flight) and GROUND. The input is one real disrupted flight, a row of `data/challenge2/flights.csv` (DOT 2015, `WEATHER_DELAY > 15` or `LATE_AIRCRAFT_DELAY > 20`). The wave is built at its destination airport, with the other `flights.csv` arrivals in the same window as context and weather fetched on demand from IEM (cited). Each agent sees only its own domain and can only make moves inside its own authority. A deterministic rule engine decides whether any move or plan is legal; no model ever does. Decision models choose among the options the engine offers and vote. Claude only narrates the finished outcome for the duty manager and decides nothing. The output is a revised arrival (time, runway, gate, action, delay vs schedule) plus the full log, and the human approves or overrides. BTS Jun-Aug 2024 waves are still supported as a second source.
+When weather or a late inbound disrupts an arrival, the airline duty manager coordinates by phone between the tower, the crew and ground handling. This prototype replaces those calls with exactly three agents: ATC, PILOT (for the focus flight) and GROUND. The input is one real disrupted flight, a row of `data/challenge2/flights.csv` (DOT 2015, `WEATHER_DELAY > 15` or `LATE_AIRCRAFT_DELAY > 20`). The wave is built at its destination airport, with the other `flights.csv` arrivals in the same window as context and weather fetched on demand from IEM (cited). Each agent sees only its own domain and can only make moves inside its own authority. A deterministic rule engine decides whether any move or plan is legal; no model ever does. Decision models choose among the options the engine offers and vote. Claude only narrates the finished outcome for the duty manager and decides nothing. The default mode (formulas, chosen by the benchmark) makes no model calls at all; decision models and Claude narration run in `decision` and `decision+claude` modes. The output is a revised arrival (time, runway, gate, action, delay vs schedule) plus the full log, and the human approves or overrides. BTS Jun-Aug 2024 waves are still supported as a second source.
 
 ## 2. Live demo and local run
 
@@ -139,6 +139,8 @@ Layers missing for a flight fall back to a generic model and are badged in the U
 
 ## 5. Evaluation
 
+**What the measured impact is:** every final plan obeys every rule (0 violations in every arm), while the uncoordinated status quo breaks at least one rule on 16 of 50 waves; with the rule engine switched off, 32% of the agents' plans are illegal; a decision takes about 1 s in formulas mode (`stats.elapsed_ms`). Delay is roughly neutral: on the 34 waves where the status quo is legal, the negotiated plans are about 2 min better in total. Negotiation buys legality and speed, not minutes.
+
 Method (`python3 -m atm.wave.benchmark --n 50 --arms <models>,formula --concurrency 4 --seed 7`):
 
 - 50 seeded `flights.csv` rows, stratified over the 30 busiest hubs (BTS 2024 waves remain available with `--source bts`).
@@ -158,7 +160,7 @@ Method (`python3 -m atm.wave.benchmark --n 50 --arms <models>,formula --concurre
 <!-- BENCHMARK -->
 Run: `python3 -m atm.wave.benchmark --source flights2015 --n 50 --arms openrouter:typesafe/jev-1.14,openrouter:liquid/d1-ultra,openrouter:baseten/elephant-1,formula --concurrency 4 --seed 7 --outage-n 20` (31 Oct 2026, live models, final rules). Same 50 flights.csv rows (seeded, stratified over 30 hubs) for every arm; all arms finished all 50.
 
-| Arm | Consensus | Mean turns | Solver fallback | Rule violations | Delay (min/wave) | Pax protected | Brier* | p50 / p95 ms | Errors | Same plan as formulas |
+| Arm | Consensus | Mean turns | Solver fallback | Rule violations | Total delay, all wave arrivals (min) | Pax protected | Brier* | p50 / p95 ms | Errors | Same plan as formulas |
 |---|---|---|---|---|---|---|---|---|---|---|
 | typesafe/jev-1.14 | 92% | 1.40 | 8% | 0 | 360.4 | 24.1% | 0.0294 | 458 / 554 | 0% | 30% |
 | liquid/d1-ultra | 80% | 1.54 | 20% | 0 | 351.8 | 25.5% | 0.0040 | 604 / 878 | 0% | 68% |
@@ -178,12 +180,14 @@ Run: `python3 -m atm.wave.benchmark --source flights2015 --n 50 --arms openroute
 
 ### Demo replays
 
-Recorded runs in `data/replay/` (live jev-1.14) play back with no model calls:
-- `F2015-69315` ATL, fog: no agreement in 3 turns, the deterministic solver lands DL2239 on 08L at gate T14, +26 min (the fallback path, with its reason in the log).
+Recorded runs in `data/replay/` (live jev-1.14) play back with no model calls. Waves without a recording run live.
+- `F2015-69315` ATL, fog: with jev-1.14, no agreement in 3 turns; the deterministic solver lands DL2239 on 08L at gate T14, +26 min (the fallback path, with its reason in the log). In the default formulas mode this wave reaches consensus.
 - `F2015-75` DFW, crosswind runway closures: AA1344 on 13L, gate A38, +119 min; agreed in turn 1.
 - `F2015-77162` DEN, closures: DL927 on runway 25, gate C35, +133 min; turn 1.
 - `F2015-270287` ORD: OO5559 on 09L, gate B18, +57 min; turn 1.
 - `F2015-58926` MIA: UA1634 diverts to FLL (about 134 min); agreed in turn 2.
+
+Failure case in the default mode, live (no recording): `F2015-102056` (DL2019). In turns 1-3 no plan on the table passes the engine CHECK, so the log shows three `NO_CONSENSUS` messages and a `FALLBACK` with its reason; the safety net diverts DL2019 to CSG (about 320 min). The system declines to invent a plan it cannot prove legal.
 
 ## 6. What went wrong and what we fixed
 
@@ -231,7 +235,7 @@ tests/           pytest suite
 Dockerfile, render.yaml   deployment
 ```
 
-Tests (about 100):
+Tests (121):
 
 ```bash
 python3 -m pytest -q
