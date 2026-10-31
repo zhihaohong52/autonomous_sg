@@ -122,6 +122,18 @@ def test_default_chain_uses_benchmark_winner(client):
     assert start["model_chain"] == [server._model_id(e) for e in chain]
 
 
+def test_formula_winner_defaults_to_formulas_mode(client):
+    arms = [{"model": "liquid/d1-ultra", "provider": "openrouter",
+             "summary": {"error_rate_pct": 0, "latency_p95_ms": 800, "consensus_rate_pct": 82}},
+            {"model": "typesafe/jev-1.14", "provider": "openrouter",
+             "summary": {"error_rate_pct": 0, "latency_p95_ms": 550, "consensus_rate_pct": 90}},
+            {"model": "formula", "provider": "formula", "summary": {}}]
+    server.BENCHMARK.write_text(json.dumps({"selection": {"winner": "formula"}, "arms": arms}))
+    assert client.get("/api/config").json()["default_mode"] == "formulas"
+    chain = server._default_chain()
+    assert chain[:2] == ["openrouter:typesafe/jev-1.14", "openrouter:liquid/d1-ultra"] and chain[-1] == "formula"
+
+
 def test_v2_validation_error_shape(client):
     r = client.post("/api/negotiate-wave", content="[1,2]", headers={"content-type": "application/json"})
     assert r.status_code == 422 and r.json()["error"]["code"] == "invalid_request"

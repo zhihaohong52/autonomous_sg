@@ -54,7 +54,7 @@ def config():
     v1 = {"jev_available": jev.available(), "model": negotiation.MODEL,
           "policies": ["rule", "jev", "jev+claude", "llm"], "n_disruptions": len(scenario.disruptions())}
     models, default_model = _models()
-    return {**v1, "version": "2.0", "modes": MODES, "default_mode": "decision", "models": models,
+    return {**v1, "version": "2.0", "modes": MODES, "default_mode": _default_mode(), "models": models,
             "default_model": default_model,
             "llm_available": bool(os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")),
             "tracing": bool(os.environ.get("LANGSMITH_API_KEY")),
@@ -218,16 +218,36 @@ def _models() -> tuple[list[dict], str]:
     return out, _model_id(_default_chain()[0])
 
 
-def _default_chain() -> list[str]:
-    """Benchmark winner (if any) first, then the remaining DEFAULT_CHAIN entries (deduped), then formula."""
+def _ranked_models() -> list[str]:
+    """Benchmark model arms, best first: arms passing every selection gate, then by consensus rate."""
+    def ok(s: dict) -> bool:
+        p95 = s.get("latency_p95_ms")
+        return (s.get("error_rate_pct", 100) < 2 and p95 is not None and p95 < 1000
+                and s.get("consensus_rate_pct", 0) >= 90)
+    arms = [a for a in (_benchmark() or {}).get("arms", []) if a.get("model") != "formula"]
+    arms.sort(key=lambda a: (ok(a.get("summary", {})), a.get("summary", {}).get("consensus_rate_pct", 0)), reverse=True)
+    return [f'{a.get("provider") or "openrouter"}:{a["model"]}' for a in arms if a.get("model")]
+
+
+def _default_mode() -> str:
+    """Follow the benchmark verdict: formulas by default when the formula agents win, else the decision models."""
     winner = ((_benchmark() or {}).get("selection") or {}).get("winner")
+    return "formulas" if winner == "formula" else "decision"
+
+
+def _default_chain() -> list[str]:
+    """Decision-mode chain: benchmark winner (if a model), then the other benchmark models best first,
+    then the remaining DEFAULT_CHAIN entries (deduped), then formula (always terminal)."""
+    winner = ((_benchmark() or {}).get("selection") or {}).get("winner")
+    ranked = _ranked_models()
+    head = []
+    if winner and winner != "formula":
+        head = [e for e in ranked if e.split(":", 1)[1] == winner] or [_norm_model(winner)]
     chain: list[str] = []
-    for e in ([_norm_model(winner)] if winner else []) + list(decide.DEFAULT_CHAIN) + ["formula"]:
-        if e not in chain and not (e == "formula" and chain and chain[-1] == "formula"):
+    for e in head + ranked + list(decide.DEFAULT_CHAIN):
+        if e != "formula" and e not in chain:
             chain.append(e)
-    if "formula" in chain[:-1]:  # formula must be terminal
-        chain = [e for e in chain if e != "formula"] + ["formula"]
-    return chain
+    return chain + ["formula"]
 
 
 def _client_ip(request: Request) -> str:
