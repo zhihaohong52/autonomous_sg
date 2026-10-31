@@ -27,7 +27,8 @@ Choices made here (documented for review):
   incumbent, the proposals made earlier in this turn and its own proposal. Consensus = one
   CHECK-passed plan ACCEPTed by all three agents within the same turn (best max-min utility if
   several). A plan GROUND proposes in turn t can therefore only win from turn t+1 on, as incumbent.
-- Vote formula: P(accept) = 1.0 if utility >= reservation else 0.0; ACCEPT iff P(accept) >= 0.5.
+- Vote formula: P(accept) = 1.0 if utility >= reservation else 0.0. A model vote ACCEPTs at P >= 0.7 and
+  REJECTs at P <= 0.3; in between (uncertain) the formula verdict decides and the vote says so.
   Reservation_t = best own utility seen on a FEASIBLE plan so far * (0.9 - 0.12 * (t - 1)).
 - Incumbent for turn t+1: the CHECK-passed plan of turn t (incumbent or proposal) with the highest
   max-min utility; if none passed, the proposal with the fewest violations.
@@ -243,6 +244,9 @@ class _Run:
         for ag in self.best_seen:
             self.best_seen[ag] = max(self.best_seen[ag], agent_utility(self.wave, plan, ag))
 
+
+ACCEPT_AT = 0.7     # model P(accept) at or above: ACCEPT
+ACCEPT_BELOW = 0.3  # at or below: REJECT; in between the formula decides
 
 class S(TypedDict, total=False):
     ctx: Any
@@ -504,14 +508,22 @@ def _votes(run: _Run, agent: str, rnd: int, plans: list[JointPlan]) -> tuple[lis
     votes = []
     for p in plans:
         r = rs[p.id]
-        acc = float(r.value) >= 0.5
+        pa = float(r.value)
+        formula_acc = us[p.id] >= res
+        # TypeSafe confidence routing: act on a confident model answer, defer the uncertain band to the formula
+        uncertain = r.provider != "formula" and ACCEPT_BELOW < pa < ACCEPT_AT
+        acc = formula_acc if (r.provider == "formula" or uncertain) else pa >= ACCEPT_AT
         v = {"plan_id": p.id, "vote": "ACCEPT" if acc else "REJECT", "utility": us[p.id], "reservation": res}
         if run.mode != "formulas":
-            v["p_accept"] = round(float(r.value), 3)
+            v["p_accept"] = round(pa, 3)
         if r.provider == "formula":
             v["reason"] = f"utility {us[p.id]:.3f} {'>=' if acc else '<'} reservation {res:.3f}"
+        elif uncertain:
+            v["decided_by"] = "formula"
+            v["reason"] = (f"{r.model}: P(accept)={pa:.2f} is uncertain ({ACCEPT_BELOW:g}-{ACCEPT_AT:g}); formula decides: "
+                           f"utility {us[p.id]:.3f} {'>=' if acc else '<'} reservation {res:.3f}")
         else:
-            v["reason"] = f"{r.model}: P(accept)={float(r.value):.2f} (utility {us[p.id]:.3f}, reservation {res:.3f})"
+            v["reason"] = f"{r.model}: P(accept)={pa:.2f} (utility {us[p.id]:.3f}, reservation {res:.3f})"
         votes.append(v)
     return buf, votes, _meta("noul", first)
 
