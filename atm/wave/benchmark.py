@@ -8,6 +8,8 @@ Definitions (also written to selection.reasons):
 - latency_*         = DecisionMeta.latency_ms of model-answered decisions only (null when there are none).
 - failed waves      = non-consensus + one error decision; outcome means use the waves that succeeded in every arm.
 - brier             = mean (p_accept - y)^2 over model-answered VOTE entries, y = formula verdict (utility >= reservation).
+- status quo may violate rules: baseline means cover all common waves, feasible_only covers the waves where it is
+  feasible, and regressions vs status quo are only reported on those waves.
 """
 from __future__ import annotations
 
@@ -174,6 +176,13 @@ def feasible_real(wave, result: dict) -> bool:
     return rules.feasible(wave, plan_from_dict(result["final_plan"]))
 
 
+def status_quo_feasible(wave, result: dict) -> bool:
+    ev = result["baseline"]["evaluation"]
+    if "feasible" in ev:
+        return bool(ev["feasible"])
+    return rules.feasible(wave, plan_from_dict(result["baseline"]["plan"]))
+
+
 def summarize(runs: dict[str, dict], formula_runs: dict[str, dict], waves: list, common: set[str]) -> tuple[dict, dict]:
     """Returns (contract summary, extras for selection/markdown)."""
     N = len(waves)
@@ -324,7 +333,7 @@ def collect_failures(label: str, runs: dict, waves: list) -> list[dict]:
             out.append({"wave_id": wid, "model": label, "reason": "rule violation in final plan"})
         bd = r["baseline"]["evaluation"]["totals"]["delay_min"]
         nd = r["evaluation"]["totals"]["delay_min"]
-        if nd > bd:
+        if status_quo_feasible(by_id[wid], r) and nd > bd:
             out.append({"wave_id": wid, "model": label,
                         "reason": f"regression vs status quo: delay {nd} > {bd} min"})
     return out
@@ -350,6 +359,10 @@ def markdown(rep: dict) -> str:
                  f"| {s['fallback_rate_pct']} | {s['rule_violations_in_agreed_plans']} | {s['delay_min']} | {s['fuel_kg']} "
                  f"| {s['pax_protected_pct']} | {s['overtime_min']} | {s['agreement_with_formula_pct']} | {_f(s['brier'])} "
                  f"| {_f(s['latency_p50_ms'])} | {_f(s['latency_p95_ms'])} | {s['error_rate_pct']} |")
+    fo = b["feasible_only"]
+    L += ["", f"Status quo infeasible on {len(b['infeasible_ids'])} waves: {', '.join(b['infeasible_ids']) or 'none'}.", ""]
+    L += [f"- {a['label']} vs status quo on {b['n_feasible']} feasible-status-quo waves: delay "
+          f"{a['delay_min_vs_feasible_status_quo']} min vs {fo['delay_min']} min" for a in rep["arms"]]
     sel = rep["selection"]
     o = rep["outage_test"]
     ab = rep["ablation_no_engine_unsafe_pct"]
@@ -399,16 +412,26 @@ def main(argv: list[str] | None = None) -> dict:
     formula_runs = all_runs["formula"]
     common = {w.id for w in waves if all("result" in all_runs[arm].get(w.id, {}) for arm in arm_list)}
 
+    by_id = {w.id: w for w in waves}
+    sq_ok = sorted(w for w in common if status_quo_feasible(by_id[w], formula_runs[w]["result"]))
+    sq_bad = sorted(common - set(sq_ok))
+    keys = (*TOTAL_KEYS, "diversions")
+    ok_f = [formula_runs[w]["result"] for w in common]
+    sq_f = [formula_runs[w]["result"] for w in sq_ok]
+    base = {k: mean([r["baseline"]["evaluation"]["totals"][k] for r in ok_f]) for k in keys}
+    base["n_feasible"] = len(sq_ok)
+    base["infeasible_ids"] = sq_bad
+    base["feasible_only"] = {k: mean([r["baseline"]["evaluation"]["totals"][k] for r in sq_f]) for k in keys}
+
     arms, failures = [], list(build_fail)
     for arm in arm_list:
         prov, model = arm_parts(arm)
         summ, extra = summarize(all_runs[arm], formula_runs, waves, common)
-        arms.append({"model": model, "provider": prov, "label": model, "summary": summ, **extra})
+        arm_delay = mean([all_runs[arm][w]["result"]["evaluation"]["totals"]["delay_min"] for w in sq_ok])
+        arms.append({"model": model, "provider": prov, "label": model, "summary": summ,
+                     "delay_min_vs_feasible_status_quo": arm_delay, **extra})
         failures += collect_failures(model, all_runs[arm], waves)
 
-    ok_f = [formula_runs[w]["result"] for w in common]
-    base = {k: mean([r["baseline"]["evaluation"]["totals"][k] for r in ok_f])
-            for k in (*TOTAL_KEYS, "diversions")}
     selection = select(arms, len(waves), base)
     if len(waves) < a.n:
         selection["reasons"].append(f"loaded {len(waves)} of {a.n} requested waves")

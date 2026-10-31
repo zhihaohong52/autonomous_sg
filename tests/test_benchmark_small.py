@@ -19,6 +19,8 @@ def test_small_benchmark(tmp_path):
         assert arm["summary"]["rule_violations_in_agreed_plans"] == 0
     assert 0 <= rep["ablation_no_engine_unsafe_pct"] <= 100
     assert {"delay_min", "fuel_kg", "pax_protected_pct", "overtime_min", "diversions"} <= set(rep["baseline"])
+    assert "n_feasible" in rep["baseline"] and 0 <= rep["baseline"]["n_feasible"] <= rep["n_common"]
+    assert len(rep["baseline"]["infeasible_ids"]) == rep["n_common"] - rep["baseline"]["n_feasible"]
     assert (tmp_path / "BENCHMARK.md").read_text().startswith("# Benchmark")
 
 
