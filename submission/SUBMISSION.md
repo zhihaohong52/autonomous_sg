@@ -18,6 +18,8 @@ https://github.com/zhihaohong52/final_approach
 
 Deck video: https://youtu.be/JpgnufOeDQQ
 
+Cover image: `docs/architecture.png` (1920×1080 PNG, under 2 MB). Alternative: `deck/poster.png` (title slide).
+
 Live demo: https://disruption-negotiator.onrender.com (Render free tier, allow about 1 minute for a cold start)
 
 ---
@@ -54,8 +56,8 @@ Click path:
 
 1. Wave dropdown in the toolbar: choose `F2015-75` (DFW, crosswind runway closures). The recorded runs are listed first; if it is not there, open "Flight from flights.csv" and search AA1344.
 2. Open the settings menu next to "Random wave": Decision mode "Decision models" (the default), model jev-1.14, tick "Replay the recorded run" (no network risk on stage). Click **Start negotiation**.
-3. Watch the "Runways and gates" timeline: flights move as agents make moves; a vetoed move shows "Vetoed:" with the rule.
-4. Open the **Negotiation log** tab: one AGENT_TURN per agent, ATC then PILOT then GROUND; tick "Show model, probability and latency".
+3. Watch the "Runways and gates" timeline: flights move as agents make moves; a vetoed move shows "Vetoed:" with the rule. When it finishes, flip the **Before | After** toggle to compare the status quo with the agreed plan (the Safety rules tab has the same toggle).
+4. Open the **Negotiation log** tab: one AGENT_TURN per agent, ATC then PILOT then GROUND, each with a "what changed" diff; tick "Show model, probability and latency" to see jev-1.14's P(accept) on every vote.
 5. Open the **Safety rules** tab: every rule for every flight, with source and values.
 6. Read the result: AA1344 on 13L, gate A38, +119 min, agreed in turn 1. Point at the brief and its line "it decides nothing".
 7. Failure case: search flights.csv for `F2015-102056` (DL2019; runs live, about 10 s). In all 3 turns no plan passes the engine CHECK, so the log shows three NO_CONSENSUS messages and a FALLBACK with its reason; the safety net diverts DL2019 to CSG. Backup if time is short: `F2015-69315` (ATL fog), where the agents only agree in turn 2 after conceding.
@@ -93,3 +95,13 @@ Gate occupancy, fuel on board, crew shifts, passenger connections, and two wide 
 
 **How is safety guaranteed?**
 Only the deterministic rule engine decides legality: every move and every proposal is checked, agents vote only on plans that passed the check, the final plan is checked again, and models can only pick among options the engine offered. If nothing passes, the system does not invent a plan: the solver's safety net (remote stand, ground delay or divert) takes over, and the benchmark shows 0 violations in every final plan.
+
+**How many rounds does it take to agree?**
+On 999 waves (1,000-row run), 80.7% agree in turn 1, 18.6% in turn 2 and 0.2% in turn 3; 0.5% never agree because no reachable plan passes the rules, and the solver decides (mean 1.20 turns). Turn 2 exists mostly because Ground speaks last, so ATC and the Pilot can only vote on Ground's plan in the next turn.
+
+**Isn't a 0.5 acceptance threshold arbitrary?**
+We follow TypeSafe's confidence routing: a model vote counts only when confident, P(accept) >= 0.7 accepts and <= 0.3 rejects; anything in between falls back to the formula verdict and the log marks it `decided_by: formula`. Because code hands the model pre-computed verdicts, its votes are near 0 or 1: in the recorded runs none landed in the band.
+
+**Is the delay result significant?**
+At n = 50 the 95% intervals are about ±47 min, so the delay differences between arms are not significant; at 1,000 rows jev-1.14 and the formulas are 329.8 vs 329.3 ± 10.6 min with the same outcome on every wave. The claims we make are about legality (0 violations vs 16/50 for the status quo), consensus and robustness, which hold at both sizes.
+
