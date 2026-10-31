@@ -172,6 +172,10 @@ td .sub { display: block; font-size: var(--fs-small); color: var(--muted); line-
 .msg-why { color: var(--muted); font-size: 13px; margin-top: 2px; max-width: 80ch; }
 .msg-dec { color: var(--muted); font-size: var(--fs-small); margin-top: 2px; font-family: var(--mono); }
 .msg.rej .msg-body { color: var(--negative); }
+.msg-diff { margin: 4px 0 2px 116px; padding: 6px 10px; border-left: 2px solid var(--rule); font: 12px/1.6 var(--mono); white-space: pre-wrap; }
+.msg-diff.muted { color: var(--muted); border-left-color: transparent; padding-left: 0; }
+.msg-diff-total { color: var(--muted); margin-top: 2px; }
+.msg-diff .pos { color: var(--positive); } .msg-diff .neg { color: var(--negative); }
 .empty { color: var(--muted); max-width: 68ch; }
 
 /* ---------- checks matrix ---------- */
@@ -216,7 +220,7 @@ td .sub { display: block; font-size: var(--fs-small); color: var(--muted); line-
   .table-wrap th:first-child, .table-wrap td:first-child { position: sticky; left: 0; z-index: 1; background: var(--surface); padding-right: 12px; }
   .who { width: auto; }
   .msg-top { flex-direction: column; gap: 2px; }
-  .msg-why, .msg-dec { margin-left: 0; }
+  .msg-why, .msg-dec, .msg-diff { margin-left: 0; }
 }
 /* reduced motion: no travel, but every state change still shows (bars jump, the veto outline stays until the next event) */
 @media (prefers-reduced-motion: reduce) {

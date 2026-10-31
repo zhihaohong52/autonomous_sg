@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import type { AgentTurnBody, DecisionMeta, NegotiationMessage } from "../api/types";
+import type { AgentTurnBody, Assignment, DecisionMeta, JointPlan, NegotiationMessage } from "../api/types";
 import { agentClass, agentName } from "../format";
 
 const ROUND = ["Triage and opening plan", "Turn 1", "Turn 2", "Turn 3", "Fallback"];
@@ -23,12 +23,75 @@ function summary(m: NegotiationMessage): string {
   }
 }
 
+// ---- what each agent's turn changed, against the plan on the table before it spoke
+interface StepDiff { flights: string[]; delayBefore: number; delayAfter: number; breachesBefore: number | null; breachesAfter: number | null }
+
+const n1 = (v: number) => (Math.round(v * 10) / 10).toString();
+const tmin = (v?: number | null) => (v == null ? "?" : `T${v >= 0 ? "+" : ""}${n1(v)}`);
+const totalDelay = (p: JointPlan) => p.assignments.reduce((s, a) => s + (a.metrics?.delay_min ?? 0), 0);
+
+function flightDiff(a: Assignment, b: Assignment): string | null {
+  const parts: string[] = [];
+  if (a.action !== b.action) parts.push(b.action === "divert" ? "diverts" : "lands instead of diverting");
+  if (b.action === "land") {
+    if (a.runway !== b.runway) parts.push(`runway ${a.runway ?? "-"} → ${b.runway}`);
+    if (Math.abs((a.slot_min ?? 0) - (b.slot_min ?? 0)) >= 0.1) parts.push(`lands ${tmin(a.slot_min)} → ${tmin(b.slot_min)}`);
+    if (a.gate !== b.gate) parts.push(`gate ${a.gate ?? "-"} → ${b.gate === "RS" ? "remote stand" : b.gate}`);
+    if (a.speed_reduction_min !== b.speed_reduction_min) parts.push(`slows ${n1(a.speed_reduction_min)} → ${n1(b.speed_reduction_min)} min en route`);
+    if (a.ground_delay_min !== b.ground_delay_min) parts.push(`ground delay ${n1(a.ground_delay_min)} → ${n1(b.ground_delay_min)} min`);
+    if (Math.abs(a.metrics.hold_min - b.metrics.hold_min) >= 0.1) parts.push(`holding ${n1(a.metrics.hold_min)} → ${n1(b.metrics.hold_min)} min`);
+    if (a.metrics.pax_protected !== b.metrics.pax_protected) parts.push(`connecting pax ${a.metrics.pax_protected} → ${b.metrics.pax_protected} of ${b.metrics.pax_total}`);
+  }
+  if (!parts.length) return null;
+  if (Math.abs(a.metrics.delay_min - b.metrics.delay_min) >= 0.1) parts.push(`delay ${n1(a.metrics.delay_min)} → ${n1(b.metrics.delay_min)} min`);
+  return `${b.callsign}  ${parts.join(" · ")}`;
+}
+
+function stepDiffs(messages: NegotiationMessage[]): Map<number, StepDiff> {
+  const out = new Map<number, StepDiff>();
+  let prev: JointPlan | null = null;
+  let prevBreaches: number | null = null;
+  messages.forEach((m, i) => {
+    const b = m.body;
+    if (b.type === "OPEN") { prev = b.plan; prevBreaches = b.evaluation.checks.filter((c) => !c.passed).length; return; }
+    if (b.type !== "AGENT_TURN" || !b.proposal) return;
+    const cur = b.proposal;
+    const check = messages.slice(i + 1).find((x) => x.body.type === "CHECK" && x.body.plan_id === cur.id)?.body;
+    const before: JointPlan | null = prev;
+    const breaches = check && check.type === "CHECK" ? check.violations.length : before && before.id === cur.id ? prevBreaches : null;
+    const byCs = new Map((before?.assignments ?? []).map((a) => [a.callsign, a]));
+    const flights = before ? cur.assignments.map((a) => { const o = byCs.get(a.callsign); return o ? flightDiff(o, a) : null; }).filter((x): x is string => !!x) : [];
+    out.set(m.seq, { flights, delayBefore: before ? totalDelay(before) : totalDelay(cur), delayAfter: totalDelay(cur), breachesBefore: prevBreaches, breachesAfter: breaches });
+    prev = cur; prevBreaches = breaches;
+  });
+  return out;
+}
+
+function Changes({ d }: { d: StepDiff }) {
+  const dd = d.delayAfter - d.delayBefore;
+  const br = d.breachesBefore != null && d.breachesAfter != null && d.breachesBefore !== d.breachesAfter
+    ? ` · rule breaches ${d.breachesBefore} → ${d.breachesAfter}${d.breachesAfter === 0 ? " ✓" : ""}`
+    : d.breachesAfter ? ` · ${d.breachesAfter} rule breach${d.breachesAfter === 1 ? "" : "es"} remain` : "";
+  if (!d.flights.length) return <div className="msg-diff muted">No change to the plan{br}</div>;
+  return (
+    <div className="msg-diff">
+      {d.flights.map((f) => <div key={f}>{f}</div>)}
+      <div className="msg-diff-total">
+        Wave total delay {n1(d.delayBefore)} → {n1(d.delayAfter)} min
+        {Math.abs(dd) >= 0.1 && <span className={dd < 0 ? "pos" : "neg"}> ({dd > 0 ? "+" : ""}{n1(dd)})</span>}
+        {br}
+      </div>
+    </div>
+  );
+}
+
 const meta = (d: DecisionMeta) => `${d.kind === "formula" ? "formula" : d.model}${d.confidence != null ? ` · p ${d.confidence.toFixed(2)}` : ""} · ${d.latency_ms} ms`;
 
-function Turn({ b, details }: { b: AgentTurnBody; details: boolean }) {
+function Turn({ b, details, diff }: { b: AgentTurnBody; details: boolean; diff?: StepDiff }) {
   const acc = b.votes.filter((v) => v.vote === "ACCEPT").length;
   return (
     <>
+      {diff && <Changes d={diff} />}
       {b.rejected.map((r) => (
         <div key={r.move.id} className="msg-why neg">Vetoed: {r.move.label}. {r.violations[0]?.detail ?? r.reason}</div>
       ))}
@@ -65,6 +128,7 @@ export function Log({ messages, running, focus, details = false }: { messages: N
     );
   }
   const rounds = [...new Set(messages.map((m) => m.round))];
+  const diffs = stepDiffs(messages);
   return (
     <div className="log" ref={box} tabIndex={0} role="region" aria-label="Negotiation log">
       {rounds.map((r) => (
@@ -80,7 +144,7 @@ export function Log({ messages, running, focus, details = false }: { messages: N
                   <span className={`who ${agentClass(m.sender)}`}>{agentName(m.sender)}</span>
                   <div className="msg-body">{summary(m)}</div>
                 </div>
-                {b.type === "AGENT_TURN" && <Turn b={b} details={details} />}
+                {b.type === "AGENT_TURN" && <Turn b={b} details={details} diff={diffs.get(m.seq)} />}
                 {(b.type === "NO_CONSENSUS" || b.type === "FALLBACK") && <div className="msg-why">{b.reason}</div>}
                 {b.type === "MOVE_REJECTED" && b.violations[0] && <div className="msg-why neg">{b.violations[0].detail} · {b.violations[0].source}</div>}
                 {b.type !== "AGENT_TURN" && b.type !== "TRIAGE" && m.rationale && <div className="msg-why">{m.rationale}</div>}
