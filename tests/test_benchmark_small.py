@@ -57,3 +57,46 @@ def test_failed_waves_excluded_from_means(tmp_path, monkeypatch):
     assert f["n_ok"] == 2 and f["failed_ids"] == [ids[0]]
     assert f["summary"]["error_rate_pct"] > 0 and f["summary"]["consensus_rate_pct"] < 100
     assert any("1/3 waves failed" in r for r in rep["selection"]["reasons"])
+
+
+def test_decisions_and_brier_read_agent_turns():
+    from atm.wave.benchmark import brier, decisions
+    mdl = {"kind": "noul", "model": "m", "provider": "openrouter", "latency_ms": 300}
+    mv = {"kind": "choice", "model": "m", "provider": "openrouter", "latency_ms": 200, "fallback_from": ["x"]}
+    fm = {"kind": "formula", "model": "formula", "provider": "formula", "latency_ms": 0}
+    votes = [{"plan_id": "a", "vote": "ACCEPT", "p_accept": 0.8, "utility": 0.7, "reservation": 0.6},
+             {"plan_id": "b", "vote": "REJECT", "p_accept": 0.5, "utility": 0.5, "reservation": 0.6}]
+    log = [{"type": "TRIAGE", "round": 0, "body": {"type": "TRIAGE"}, "decision": fm},
+           {"type": "AGENT_TURN", "round": 1, "decision": mdl,
+            "body": {"type": "AGENT_TURN", "decision": mdl, "votes": votes,
+                     "moves": [{"decision": mv}], "rejected": [{"decision": mv}]}},
+           {"type": "AGENT_TURN", "round": 1, "body": {"type": "AGENT_TURN", "votes": [], "moves": [], "rejected": []}}]
+    ds = decisions({"log": log})
+    assert len(ds) == 4 and sum(1 for d in ds if d.get("fallback_from")) == 2
+    assert brier([{"log": log}]) == round(((0.8 - 1) ** 2 + (0.5 - 0) ** 2) / 2, 4)
+
+
+def test_outage_uses_best_model_arm_even_if_formula_wins():
+    from atm.wave.benchmark import select
+    summ = lambda d: {"delay_min": d, "pax_protected_pct": 90, "brier": 0.1, "latency_p95_ms": 100.0,
+                      "error_rate_pct": 0.0, "consensus_rate_pct": 100.0, "fallback_rate_pct": 0.0}
+    arm = lambda m, d, p: {"model": m, "provider": p, "label": m, "n_ok": 3, "failed_ids": [], "p95_all_ms": 100.0,
+                           "summary": summ(d)}
+    base = {"delay_min": 50}
+    sel, best = select([arm("m1", 40, "openrouter"), arm("formula", 30, "formula")], 3, base)
+    assert sel["winner"] == "formula" and best["model"] == "m1"
+    sel, best = select([arm("formula", 30, "formula")], 3, base)
+    assert best is None
+
+
+def test_high_fallback_arm_with_better_delay_loses():
+    from atm.wave.benchmark import select
+    def arm(m, d, cons, fb, p="openrouter"):
+        return {"model": m, "provider": p, "label": m, "n_ok": 50, "failed_ids": [], "p95_all_ms": 100.0,
+                "summary": {"delay_min": d, "pax_protected_pct": 90, "brier": 0.1, "latency_p95_ms": 100.0,
+                            "error_rate_pct": 0.0, "consensus_rate_pct": cons, "fallback_rate_pct": fb}}
+    sel, best = select([arm("fast", 200, 68.0, 32.0), arm("steady", 250, 95.0, 5.0),
+                        arm("formula", 300, 98.0, 2.0, "formula")], 50, {"delay_min": 400})
+    assert sel["winner"] == "steady"
+    assert any("fast missed consensus >= 90%: 68.0%" in r for r in sel["reasons"])
+    assert any("fast outcomes partly from solver fallback on 16/50 waves" in r for r in sel["reasons"])

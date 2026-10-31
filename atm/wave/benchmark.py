@@ -1,13 +1,14 @@
 """Benchmark: decision-model arms vs the formula arm on the same waves (spec §10, §14; contract BenchmarkReport).
 
-    python3 -m atm.wave.benchmark --n 50 --arms openrouter:typesafe/jev-1.14,formula --concurrency 16 --seed 7
+    python3 -m atm.wave.benchmark --source flights2015 --n 50 --arms openrouter:typesafe/jev-1.14,formula --concurrency 16 --seed 7
 
 Definitions (also written to selection.reasons):
 - fallback_rate_pct = % of waves whose outcome was the deterministic solver fallback.
 - error_rate_pct    = % of decisions (all start at the arm) answered after the arm failed (non-empty fallback_from).
+- decisions         = DecisionMeta of AGENT_TURN votes and of every move/rejected move, plus TRIAGE.
 - latency_*         = DecisionMeta.latency_ms of model-answered decisions only (null when there are none).
 - failed waves      = non-consensus + one error decision; outcome means use the waves that succeeded in every arm.
-- brier             = mean (p_accept - y)^2 over model-answered VOTE entries, y = formula verdict (utility >= reservation).
+- brier             = mean (p_accept - y)^2 over model-answered votes (AGENT_TURN body.votes[]), y = formula verdict (utility >= reservation).
 - status quo may violate rules: baseline means cover all common waves, feasible_only covers the waves where it is
   feasible, and regressions vs status quo are only reported on those waves.
 """
@@ -32,7 +33,7 @@ from atm.wave.utility import evaluate
 
 ROOT = Path(__file__).resolve().parents[2]
 DEAD_MODEL = "openrouter:invalid/model-does-not-exist"
-P95_LIMIT_MS, ERR_LIMIT_PCT = 1000, 2.0
+P95_LIMIT_MS, ERR_LIMIT_PCT, CONSENSUS_LIMIT_PCT = 1000, 2.0, 90.0
 TOTAL_KEYS = ("delay_min", "fuel_kg", "pax_protected_pct", "overtime_min")
 
 
@@ -75,15 +76,43 @@ def sample_wave_ids(n: int, seed: int) -> list[str]:
     return out
 
 
-def load_waves(n: int, seed: int, fixtures: bool) -> tuple[list, list[dict]]:
+def sample_flights2015_ids(n: int, seed: int) -> list[str]:
+    """Seeded sample of flights.csv rows, round-robin (stratified) over the 30 hub destinations so IEM weather
+    is fetched for a limited set of stations. Airports without runway data are skipped by flights2015."""
+    from atm.wave import flights2015
+    from atm.wave.hubs import HUBS
+    rng = random.Random(seed)
+    by_ap: dict[str, list[str]] = {}
+    for ap in HUBS:
+        rows = flights2015.list_rows(airport=ap, limit=10 ** 7)
+        if rows:
+            ids = [r["wave_id"] for r in rows]
+            rng.shuffle(ids)
+            by_ap[ap] = ids
+    airports = sorted(by_ap)
+    rng.shuffle(airports)
+    out: list[str] = []
+    while len(out) < n and any(by_ap.values()):
+        for ap in airports:
+            if by_ap[ap] and len(out) < n:
+                out.append(by_ap[ap].pop())
+    return out
+
+
+def load_waves(n: int, seed: int, fixtures: bool, source: str = "flights2015") -> tuple[list, list[dict]]:
     """Returns (waves, build-failure rows)."""
     if fixtures:
         return fixture_waves(n), []
-    from atm.wave.build import build_wave
+    if source == "flights2015":
+        from atm.wave import flights2015
+        ids, build = sample_flights2015_ids(n, seed), lambda wid: flights2015.build_from_row(int(wid[len("F2015-"):]))
+    else:
+        from atm.wave.build import build_wave
+        ids, build = sample_wave_ids(n, seed), build_wave
     waves, bad = [], []
-    for wid in sample_wave_ids(n, seed):
+    for wid in ids:
         try:
-            waves.append(build_wave(wid))
+            waves.append(build(wid))
         except Exception as e:  # noqa: BLE001
             log(f"skip {wid}: build failed: {e}")
             bad.append({"wave_id": wid, "model": "-", "reason": f"build failed: {str(e)[:200]}"})
@@ -93,7 +122,17 @@ def load_waves(n: int, seed: int, fixtures: bool) -> tuple[list, list[dict]]:
 # ---------------------------------------------------------------- running
 
 def decisions(result: dict) -> list[dict]:
-    return [m["decision"] for m in result["log"] if m.get("decision")]
+    """Every DecisionMeta in a result log: message-level decisions (TRIAGE, AGENT_TURN vote; the body.decision of an
+    AGENT_TURN is the same object) plus the per-move decisions in AGENT_TURN moves[] and rejected[]."""
+    out = []
+    for m in result["log"]:
+        body = m.get("body") or {}
+        d = m.get("decision") or body.get("decision")
+        if d:
+            out.append(d)
+        if m["type"] == "AGENT_TURN":
+            out += [x["decision"] for x in body.get("moves", []) + body.get("rejected", []) if x.get("decision")]
+    return out
 
 
 def arm_parts(arm: str) -> tuple[str, str]:
@@ -163,9 +202,11 @@ def brier(results: list[dict]) -> float:
     errs = []
     for r in results:
         for m in r["log"]:
-            if m["type"] not in ("VOTE", "AGENT_TURN") or (m.get("decision") or {}).get("provider", "formula") == "formula":
+            body = m.get("body") or {}
+            if m["type"] not in ("VOTE", "AGENT_TURN") or \
+                    (m.get("decision") or body.get("decision") or {}).get("provider", "formula") == "formula":
                 continue
-            for v in m["body"]["votes"]:
+            for v in body.get("votes", []):
                 if "p_accept" in v:
                     y = 1.0 if v["utility"] >= v["reservation"] else 0.0
                     errs.append((v["p_accept"] - y) ** 2)
@@ -234,8 +275,10 @@ def run_ablation(waves: list) -> float | None:
     return pct(unsafe, total) if total else None
 
 
-def select(arms: list[dict], n_total: int, baseline: dict) -> dict:
-    rule = "best outcome with error < 2% and p95 < 1 s; tie -> lower Brier"
+def select(arms: list[dict], n_total: int, baseline: dict) -> tuple[dict, dict | None]:
+    """Returns (selection, best eligible model arm by the selection ordering or None). The outage test uses that
+    arm even when the overall winner is formula."""
+    rule = "best outcome among arms with error < 2%, p95 < 1 s and consensus >= 90%; tie -> lower Brier"
     reasons = ["Brier is measured against the formula verdict (y = 1 if utility >= reservation), not ground truth.",
                "cost_usd_per_wave = 0.0: output tokens free; input cost not measured.",
                "fallback_rate_pct = % of waves ending in the deterministic solver; error_rate_pct = % of decisions "
@@ -246,7 +289,7 @@ def select(arms: list[dict], n_total: int, baseline: dict) -> dict:
         if a["failed_ids"]:
             reasons.append(f"arm {a['label']}: {len(a['failed_ids'])}/{n_total} waves failed")
     if not cands:
-        return {"winner": "formula", "rule": rule, "reasons": reasons + ["No model arms were run."]}
+        return {"winner": "formula", "rule": rule, "reasons": reasons + ["No model arms were run."]}, None
 
     def key(a):
         s = a["summary"]
@@ -267,18 +310,25 @@ def select(arms: list[dict], n_total: int, baseline: dict) -> dict:
                 reasons.append(f"{a['label']} missed error < 2%: {s['error_rate_pct']}%")
             if s["latency_p95_ms"] >= P95_LIMIT_MS:
                 reasons.append(f"{a['label']} missed p95 < 1000 ms: {s['latency_p95_ms']} ms")
+            if s["consensus_rate_pct"] < CONSENSUS_LIMIT_PCT:
+                reasons.append(f"{a['label']} missed consensus >= 90%: {s['consensus_rate_pct']}%")
+            nfb = round(s["fallback_rate_pct"] * n_total / 100)
+            if nfb > 0:
+                reasons.append(f"{a['label']} outcomes partly from solver fallback on {nfb}/{n_total} waves")
     if not eligible:
         return {"winner": "formula", "rule": rule,
-                "reasons": ["No model arm was eligible; formula selected."] + reasons}
+                "reasons": ["No model arm was eligible; formula selected."] + reasons}, None
     ok = [a for a in eligible if a["summary"]["error_rate_pct"] < ERR_LIMIT_PCT
-          and a["summary"]["latency_p95_ms"] < P95_LIMIT_MS]
+          and a["summary"]["latency_p95_ms"] < P95_LIMIT_MS
+          and a["summary"]["consensus_rate_pct"] >= CONSENSUS_LIMIT_PCT]
     if ok:
         win = max(ok, key=key)
-        lead = f"{win['label']} meets both thresholds and has the best outcome among qualifying arms."
+        lead = f"{win['label']} meets all three thresholds (error, p95, consensus) and has the best outcome among qualifying arms."
     else:
         win = max(eligible, key=key)
-        lead = ("No arm met error < 2% and p95 < 1000 ms: " + ", ".join(
-            f"{a['label']} p95 {a['summary']['latency_p95_ms']} ms / error {a['summary']['error_rate_pct']}%"
+        lead = ("No arm met error < 2%, p95 < 1000 ms and consensus >= 90%: " + ", ".join(
+            f"{a['label']} p95 {a['summary']['latency_p95_ms']} ms / error {a['summary']['error_rate_pct']}% / "
+            f"consensus {a['summary']['consensus_rate_pct']}%"
             for a in eligible) + f". Picked best outcome among eligible model arms: {win['label']}.")
     reasons.insert(0, lead)
     winner = win["model"]
@@ -290,15 +340,15 @@ def select(arms: list[dict], n_total: int, baseline: dict) -> dict:
             winner = "formula"
         reasons.append(f"Mean delay: {win['label']} {ws['delay_min']} min vs formula {fs['delay_min']} min "
                        f"vs status quo {baseline['delay_min']} min.")
-    return {"winner": winner, "rule": rule, "reasons": reasons}
+    return {"winner": winner, "rule": rule, "reasons": reasons}, win
 
 
-def run_outage(winner_arm: str, waves: list, n: int, concurrency: int) -> tuple[dict, list[str]]:
+def run_outage(winner_arm: str | None, waves: list, n: int, concurrency: int) -> tuple[dict, list[str]]:
     sub = waves[:n]
     out = {"primary_disabled": DEAD_MODEL.split(":", 1)[1], "waves": len(sub), "resolved": 0, "fallbacks_used": {}}
-    if winner_arm == "formula":
+    if winner_arm is None:
         out["waves"] = 0
-        return out, ["outage test skipped (no model winner)"]
+        return out, ["outage test skipped (no model arm with model-answered decisions)"]
     if not sub:
         return out, []
     by_id = {w.id: w for w in sub}
@@ -344,7 +394,8 @@ def _f(v) -> str:
 
 
 def markdown(rep: dict) -> str:
-    L = [f"# Benchmark ({rep['n_waves']} waves, seed {rep['seed']})", f"Generated {rep['generated_at']}", "",
+    L = [f"# Benchmark ({rep['n_waves']} waves, seed {rep['seed']}, source {rep.get('source', 'bts')})",
+         f"Generated {rep['generated_at']}", "",
          "Outcome means (delay, fuel, pax, overtime, rounds, agreement) are over waves that succeeded in every arm "
          f"({rep['n_common']} of {rep['n_waves']}).", "",
          "## Arms vs status quo", "",
@@ -394,6 +445,7 @@ def main(argv: list[str] | None = None) -> dict:
     ap.add_argument("--outage-n", type=int, default=20)
     ap.add_argument("--ablation", action="store_true", help="(default on)")
     ap.add_argument("--no-ablation", action="store_true")
+    ap.add_argument("--source", choices=("bts", "flights2015"), default="flights2015")
     ap.add_argument("--fixtures", action="store_true")
     ap.add_argument("--out", default=str(ROOT / "eval"))
     a = ap.parse_args(argv)
@@ -401,7 +453,7 @@ def main(argv: list[str] | None = None) -> dict:
     arm_list = [x.strip() for x in a.arms.split(",") if x.strip()]
     if "formula" not in arm_list:
         arm_list.append("formula")  # needed for agreement_with_formula_pct
-    waves, build_fail = load_waves(a.n, a.seed, a.fixtures)
+    waves, build_fail = load_waves(a.n, a.seed, a.fixtures, a.source)
     log(f"{len(waves)} waves, arms={arm_list}")
 
     all_runs: dict[str, dict] = {}
@@ -432,15 +484,20 @@ def main(argv: list[str] | None = None) -> dict:
                      "delay_min_vs_feasible_status_quo": arm_delay, **extra})
         failures += collect_failures(model, all_runs[arm], waves)
 
-    selection = select(arms, len(waves), base)
+    selection, best_model = select(arms, len(waves), base)
     if len(waves) < a.n:
         selection["reasons"].append(f"loaded {len(waves)} of {a.n} requested waves")
-    winner_arm = next((x for x in arm_list if arm_parts(x)[1] == selection["winner"]), "formula")
-    outage, notes = run_outage(winner_arm, waves, a.outage_n, a.concurrency)
+    outage_arm = next((x for x in arm_list if best_model and x != "formula" and arm_parts(x)[1] == best_model["model"]),
+                      None)
+    outage, notes = run_outage(outage_arm, waves, a.outage_n, a.concurrency)
+    if outage_arm and selection["winner"] == "formula":
+        selection["reasons"].append(f"Outage test ran with the best eligible model arm {best_model['label']} "
+                                    "(overall winner is formula).")
     selection["reasons"] += notes
     report = {
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "n_waves": len(waves), "n_common": len(common), "seed": a.seed, "arms": arms, "baseline": base,
+        "n_waves": len(waves), "n_common": len(common), "seed": a.seed,
+        "source": "fixtures" if a.fixtures else a.source, "arms": arms, "baseline": base,
         "ablation_no_engine_unsafe_pct": None if a.no_ablation else run_ablation(waves),
         "outage_test": outage,
         "selection": selection, "failures": failures, "wave_ids": [w.id for w in waves],
