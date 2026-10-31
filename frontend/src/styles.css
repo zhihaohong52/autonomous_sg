@@ -108,7 +108,7 @@ p, li, dd, .msg-why, .brief, .msg-body { text-wrap-style: pretty; }
 /* ---------- grid + cards ---------- */
 .grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: var(--gap); align-items: start; }
 .span-8 { grid-column: span 8; } .span-4 { grid-column: span 4; } .span-6 { grid-column: span 6; } .span-12 { grid-column: 1 / -1; }
-.stack { display: grid; gap: var(--gap); min-width: 0; }
+.stack { display: grid; gap: var(--gap); min-width: 0; align-content: start; }
 .card { background: var(--surface); border-radius: var(--radius-card); box-shadow: var(--shadow); padding: var(--card-pad); min-width: 0; }
 .card-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 14px; }
 .card-head h2 { font-size: 16px; font-weight: 600; }

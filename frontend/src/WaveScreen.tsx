@@ -230,7 +230,7 @@ export function WaveScreen() {
           <section className="card">
             <div className="card-head"><h2>Duty manager brief</h2><span className="meta">{result?.narration ? (result.narration.source === "claude" ? `Written by ${result.narration.model ?? "Claude"} from the log` : "Template from the log") : ""}</span></div>
             {result?.narration ? <p className="brief">{result.narration.brief}</p>
-              : <p className="empty">{status === "running" ? "Written once the agents agree." : "A plain-English brief of the agreed plan, written from the log. It decides nothing."}</p>}
+              : <p className="empty">{status === "running" ? "Written once the agents agree." : result ? `No brief for this run: ${MODE_LABEL[result.mode]} mode does not write one.` : "A plain-English brief of the agreed plan, written from the log. It decides nothing."}</p>}
             {(() => {
               const t = messages.find((m) => m.body.type === "TRIAGE");
               if (!t || t.body.type !== "TRIAGE") return null;

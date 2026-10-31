@@ -53,6 +53,7 @@ export function Benchmark() {
                       <td><span className="code">{a.label}</span>{a.model === rep.selection.winner && <span className="pill pos" style={{ marginLeft: 8 }}>Selected</span>}<span className="sub">{a.provider}</span></td>
                       {COLS.map((c) => {
                         const v = a.summary[c.key];
+                        if (v == null) return <td key={c.key} className="num muted" title="No data for this arm">—</td>;
                         const bad = c.key === "rule_violations_in_agreed_plans" && v > 0;
                         return <td key={c.key} className={`num${bad ? " neg" : ""}`}>{c.key === "cost_usd_per_wave" ? `$${v.toFixed(c.digits)}` : `${v.toFixed(c.digits)}${c.unit}`}</td>;
                       })}
@@ -66,7 +67,7 @@ export function Benchmark() {
             <div className="card-head"><h2>Why this model</h2></div>
             <ul style={{ margin: 0, paddingLeft: 18, lineHeight: 1.7 }}>{rep.selection.reasons.map((r) => <li key={r}>{r}</li>)}</ul>
             <dl className="kv" style={{ marginTop: 16 }}>
-              <dt>Engine switched off</dt><dd><span className="neg">{rep.ablation_no_engine_unsafe_pct.toFixed(1)}%</span> of agreed plans break a rule</dd>
+              <dt>Engine switched off</dt><dd>{rep.ablation_no_engine_unsafe_pct == null ? <span className="muted">Not measured in this run</span> : <><span className="neg">{rep.ablation_no_engine_unsafe_pct.toFixed(1)}%</span> of agreed plans break a rule</>}</dd>
               <dt>Outage test</dt><dd>{rep.outage_test.primary_disabled} disabled: {rep.outage_test.resolved} of {rep.outage_test.waves} waves resolved ({Object.entries(rep.outage_test.fallbacks_used).map(([k, v]) => `${k} ${v}`).join(", ")})</dd>
             </dl>
           </section>

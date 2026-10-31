@@ -83,7 +83,8 @@ export function Checks({ wave, ev, base }: { wave: WaveScenario; ev: PlanEvaluat
   })();
   const [sel, setSel] = useState<{ rule: RuleId; cs: string } | null>(null);
   const pick = sel ?? (firstFail ? { rule: firstFail.rule, cs: firstFail.callsign ?? "" } : null);
-  const chosen: RuleCheck | undefined = pick ? e?.checks.find((c) => c.rule === pick.rule && c.callsign === pick.cs) : undefined;
+  const find = (rule: RuleId, cs: string) => e?.checks.find((c) => c.rule === rule && c.callsign === cs) ?? e?.checks.find((c) => c.rule === rule && !c.callsign);
+  const chosen: RuleCheck | undefined = pick ? find(pick.rule, pick.cs) : undefined;
   return (
     <div className="card">
       <div className="card-head">
@@ -103,7 +104,7 @@ export function Checks({ wave, ev, base }: { wave: WaveScenario; ev: PlanEvaluat
                   <tr key={r.id}>
                     <td style={{ height: 34 }}>{r.name} <span className="code muted" style={{ fontSize: 11 }}>{r.id}</span></td>
                     {wave.flights.map((f) => {
-                      const c = e.checks.find((x) => x.rule === r.id && x.callsign === f.callsign);
+                      const c = find(r.id, f.callsign);
                       const on = pick?.rule === r.id && pick.cs === f.callsign;
                       return (
                         <td key={f.callsign} style={{ height: 34 }}>
@@ -122,14 +123,14 @@ export function Checks({ wave, ev, base }: { wave: WaveScenario; ev: PlanEvaluat
           <div className="evidence" aria-live="polite">
             {chosen ? (
               <>
-                <div><span className={`pill ${chosen.passed ? "pos" : "neg"}`}>{chosen.passed ? "Pass" : "Fail"}</span> <span className="code">{chosen.rule}</span> · <span className="code">{chosen.callsign}</span></div>
+                <div><span className={`pill ${chosen.passed ? "pos" : "neg"}`}>{chosen.passed ? "Pass" : "Fail"}</span> <span className="code">{chosen.rule}</span> · <span className="code">{chosen.callsign ?? "all flights"}</span></div>
                 <p style={{ marginTop: 8, fontSize: 13 }}>{chosen.detail}{which === "plan" && chosen.passed && base?.checks.some((c) => !c.passed && c.rule === chosen.rule && c.callsign === chosen.callsign) ? <span className="muted"> · the status quo breaks this rule</span> : null}</p>
                 <dl>
                   <dt>Source</dt><dd style={{ fontFamily: "var(--font)" }}>{chosen.source}</dd>
                   {Object.entries(chosen.evidence).map(([k, v]) => <Fragment key={k}><dt>{k.replace(/_/g, " ")}</dt><dd>{String(v)}</dd></Fragment>)}
                 </dl>
               </>
-            ) : <span className="muted">All {e.checks.length} checks pass. Choose a cell to see its evidence.</span>}
+            ) : <span className="muted">{e.checks.length ? `All ${e.checks.length} checks pass. Choose a cell to see its evidence.` : "The engine returned no checks for this plan."}</span>}
           </div>
         </>
       )}
@@ -145,7 +146,7 @@ export function Weather({ wave }: { wave: WaveScenario }) {
       <div className="card-head"><h2>Weather and runways</h2><span className="meta">{m ? `METAR ${clock(m.observed_at, 0)}` : "No METAR"}</span></div>
       {m ? <p className="code" style={{ fontSize: 12, color: "var(--soft)", marginBottom: 12, overflowWrap: "anywhere" }}>{m.raw}</p>
         : <p className="empty" style={{ marginBottom: 12 }}>No METAR for this hour; wind limits use the generic model.</p>}
-      <table>
+      {!wave.runway_wind.length ? <p className="empty">No wind components for this wave's runways.</p> : <table>
         <thead><tr><th>Runway</th><th className="num">Head</th><th className="num">Cross</th><th className="num">Limit</th><th>Status</th></tr></thead>
         <tbody>
           {wave.runway_wind.map((w) => {
@@ -161,8 +162,8 @@ export function Weather({ wave }: { wave: WaveScenario }) {
             );
           })}
         </tbody>
-      </table>
-      <p className="muted" style={{ fontSize: 12, marginTop: 10 }}>Limits: {[...new Set(wave.runway_wind.map((w) => w.limit_source))].join("; ")}. Crosswind includes gusts.</p>
+      </table>}
+      {wave.runway_wind.length > 0 && <p className="muted" style={{ fontSize: 12, marginTop: 10 }}>Limits: {[...new Set(wave.runway_wind.map((w) => w.limit_source))].join("; ")}. Crosswind includes gusts.</p>}
     </div>
   );
 }
