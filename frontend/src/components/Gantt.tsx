@@ -39,8 +39,13 @@ export function Gantt({ wave, plan, other, turn, rejection }: Props) {
   const times = plans.flatMap((p) => land(p).flatMap((a) => [a.slot_min ?? 0, a.metrics.in_block_min ?? 0]));
   const lastPlan = plans.flatMap((p) => land(p).map((a) => (a.metrics.in_block_min ?? a.slot_min ?? 0) + turn));
   const lastQueue = wave.queue.map((q) => q.slot_min + 2);
-  const START = Math.min(0, Math.floor((Math.min(0, ...times) - 3) / 15) * 15);
-  const END = Math.min(180, Math.max(75, Math.ceil((Math.max(0, ...lastPlan, ...lastQueue) + 3) / 15) * 15));
+  // when every negotiated landing is well after the window (late inbounds), start just before the first one
+  // so the plan is not squeezed against fixed traffic hours earlier; the 3 h cap counts from START
+  const firstPlan = times.length ? Math.min(...times) : 0;
+  const START = firstPlan > 45 ? Math.floor((firstPlan - 15) / 15) * 15 : Math.min(0, Math.floor((Math.min(0, ...times) - 3) / 15) * 15);
+  const lastAll = Math.max(START, ...lastPlan, ...(firstPlan > 45 ? [] : lastQueue));
+  const END = Math.min(START + 180, Math.max(START + 75, Math.ceil((lastAll + 3) / 15) * 15));
+  const inView = (from: number, to: number) => to >= START && from <= END;
   const x = (m: number) => LABEL + ((Math.max(START, Math.min(END, m)) - START) / (END - START)) * (W - LABEL - RIGHT);
 
   const yRwy = (id: string) => AXIS + runways.findIndex((r) => r.id === id) * LANE;
@@ -52,7 +57,7 @@ export function Gantt({ wave, plan, other, turn, rejection }: Props) {
       const from = a.metrics.in_block_min ?? a.slot_min ?? 0;
       return { kind: "wave" as const, label: a.callsign, from, to: from + turn };
     });
-    const busy = g.busy.map((b) => ({ kind: "busy" as const, label: b.label, from: b.from_min, to: b.to_min }));
+    const busy = g.busy.filter((b) => inView(b.from_min, b.to_min)).map((b) => ({ kind: "busy" as const, label: b.label, from: b.from_min, to: b.to_min }));
     const items = rows([...busy, ...flights]);
     return { g, items, n: Math.max(1, ...items.map((i) => i.row + 1)) };
   });
@@ -95,7 +100,7 @@ export function Gantt({ wave, plan, other, turn, rejection }: Props) {
                   <text x={x(START) + 8} y={ry + 15} style={{ fill: "var(--muted)" }}>Closed{r.closed_reason ? ` · ${r.closed_reason}` : ""}</text>
                 </>
               )}
-              {wave.queue.filter((q) => q.runway === r.id).map((q) => (
+              {wave.queue.filter((q) => q.runway === r.id && inView(q.slot_min, q.slot_min)).map((q) => (
                 <rect key={q.callsign} x={x(q.slot_min)} y={ry + 4} width={4} height={BAR} rx={1} fill="var(--queue)">
                   <title>{`${q.callsign} ${q.aircraft_type ?? ""} ${q.wake} · ${clock(wave.window_start, q.slot_min)} (fixed traffic)`}</title>
                 </rect>
