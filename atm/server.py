@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import functools
 import json
 import os
 import random
@@ -56,6 +57,7 @@ def _warm() -> None:
             from .wave import flights2015
             flights2015._index()
             _replay_summaries()
+            _bts_waves(None, None, 50)
         except Exception:  # noqa: BLE001 - warming is best effort
             pass
     threading.Thread(target=run, daemon=True).start()
@@ -319,7 +321,17 @@ def _sse(event: str, data) -> str:
 def waves(airport: str | None = None, q: str | None = None, limit: int = 50):
     limit = max(0, min(limit, 500))
     head = [] if (airport or q) else _replay_summaries()  # recorded flights.csv rows first: the challenge input
-    return (head + WB.list_waves(airport=airport, q=q, limit=limit))[:limit]
+    return (head + _bts_waves(airport, q, limit))[:limit]
+
+
+@functools.lru_cache(maxsize=256)
+def _bts_waves_cached(airport: str | None, q: str | None, limit: int) -> tuple:
+    return tuple(WB.list_waves(airport=airport, q=q, limit=limit))
+
+
+def _bts_waves(airport: str | None, q: str | None, limit: int) -> list[dict]:
+    """The BTS wave index is static, so listings are cached (slow on a small CPU)."""
+    return [dict(w) for w in _bts_waves_cached(airport or None, q or None, limit)]
 
 
 @app.get("/api/flights")
