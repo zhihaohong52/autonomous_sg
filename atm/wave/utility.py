@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import math
 
-from atm.wave.model import Assignment, FlightMetrics, JointPlan, Wave, WaveFlight, agent_ids
+from atm.wave.model import Assignment, FlightMetrics, JointPlan, Wave, WaveFlight
 
 # ---------------------------------------------------------------- physical constants
 HOLD_BURN_KG_MIN = {"SUPER": 180.0, "HEAVY": 110.0, "B757": 70.0, "LARGE": 45.0, "SMALL": 25.0}
@@ -16,7 +16,7 @@ TAXI_NEAR_MIN = 6.0
 TAXI_FAR_MIN = 10.0
 TYPICAL_TAXI_MIN = 6.0                 # scheduled in-block = sched_min + typical taxi
 REMOTE_BUS_MIN = 10.0                  # passengers bussed from the remote stand
-TURNAROUND_MIN = 45.0                  # gate occupancy and crew/aircraft turn
+TURNAROUND_MIN = 45.0                  # default only; per airport: turnaround_min(wave) (workbook)
 MIN_CONNECT_MIN = 35.0
 DIVERT_EXTRA_DELAY_MIN = 90.0          # divert delay = alternate_min + 90
 MAX_SPEED_REDUCTION_MIN = 8.0
@@ -25,7 +25,8 @@ MAX_SPEED_REDUCTION_MIN = 8.0
 HOLD_CAP_MIN = 20.0          # ATC: mean hold per flight at which the holding penalty saturates
 TAXI_EXTRA_CAP_MIN = TAXI_FAR_MIN - TAXI_NEAR_MIN   # ATC: extra taxi beyond near
 DELAY_CAP_MIN = 60.0         # PILOT: own delay at which the delay penalty saturates
-OVERTIME_CAP_MIN = 30.0      # GROUND: mean crew overtime per flight
+OVERTIME_CAP_MIN = 30.0      # GROUND: mean paid overtime (overtime x OVERTIME_MULT) per flight
+OVERTIME_MULT = 1.5          # workbook: ground crew overtime costs 1.5x after the 8 h shift
 NEXT_DEP_CAP_MIN = 60.0      # GROUND: mean next-departure delay per flight
 DIVERT_FUEL_TERM = 0.5       # PILOT: fuel term for a diversion (fuel is safe but spent flying away)
 
@@ -44,7 +45,38 @@ def fuel_info(f: WaveFlight) -> tuple[float, str | None, float | None, float]:
 
 
 def hold_burn(f: WaveFlight) -> float:
-    return HOLD_BURN_KG_MIN.get(f.wake, HOLD_BURN_KG_MIN["LARGE"])
+    """Holding burn kg/min from the workbook: narrowbody 2400 kg/h, widebody 6500 kg/h (by gate size)."""
+    from atm.wave import constraints
+    burn = constraints.RULES["burn_kg_h"]
+    return float(burn.get(f.gate_size, burn["narrow"])) / 60.0
+
+
+def turnaround_min(wave: Wave) -> float:
+    """Workbook min_turnaround_min of the wave airport (gate occupancy and turn)."""
+    from atm.wave import constraints
+    try:
+        return float(constraints.airport(wave.airport.iata).min_turnaround_min)
+    except Exception:
+        return TURNAROUND_MIN
+
+
+def focus_callsign(wave: Wave) -> str:
+    """The disruption flight: wave.focus if set and present, else the most-delayed disrupted flight
+    (BTS arr_delay, then eta - sched), else the most-delayed flight."""
+    cs = {f.callsign for f in wave.flights}
+    foc = getattr(wave, "focus", None)
+    if foc in cs:
+        return foc
+    pool = [f for f in wave.flights if f.disrupted] or list(wave.flights)
+
+    def late(f):
+        return (float(f.delays.get("arr_delay") or 0), f.eta_earliest_min - f.sched_min, f.callsign)
+    return max(pool, key=late).callsign
+
+
+def negotiators(wave: Wave) -> list[str]:
+    """Exactly three negotiating agents (rules_of_play): ATC, the disruption flight's Pilot, Ground."""
+    return ["ATC", f"PILOT:{focus_callsign(wave)}", "GROUND"]
 
 
 def _gate(wave: Wave, gid: str | None):
@@ -95,7 +127,7 @@ def metrics(wave: Wave, a: Assignment) -> FlightMetrics:
     pax_ready = in_block + (REMOTE_BUS_MIN if gate is not None and gate.remote else 0.0)
     protected = sum(int(c.get("pax", 0)) for c in f.connections
                     if float(c["departs_min"]) - pax_ready >= MIN_CONNECT_MIN)
-    turn_end = in_block + TURNAROUND_MIN
+    turn_end = in_block + turnaround_min(wave)
     return FlightMetrics(
         hold_min=round(hold, 1), fuel_kg=round(fuel, 1),
         delay_min=round(max(0.0, in_block - (f.sched_min + TYPICAL_TAXI_MIN)), 1),
@@ -146,7 +178,7 @@ def agent_terms(wave: Wave, plan: JointPlan, agent_id: str,
                 bus += 1.0
             elif g.id != f.scheduled_gate:
                 reassign += 0.4 if sg is not None and g.pier == sg.pier else 0.6
-        return {"overtime": -W_GROUND["overtime"] * _clip(over / OVERTIME_CAP_MIN),
+        return {"overtime": -W_GROUND["overtime"] * _clip(OVERTIME_MULT * over / OVERTIME_CAP_MIN),
                 "turnaround": -W_GROUND["turnaround"] * _clip(nxt / NEXT_DEP_CAP_MIN),
                 "reassignment": -W_GROUND["reassignment"] * _clip(reassign / n),
                 "bussing": -W_GROUND["bussing"] * _clip(bus / n)}
@@ -182,7 +214,7 @@ def evaluate(wave: Wave, plan: JointPlan) -> dict:
     except ValueError:
         # Malformed plan (missing / unknown / duplicate callsigns): infeasible, nothing scored.
         return {"plan_id": plan.id, "feasible": False, "checks": [],
-                "utilities": {ag: 0.0 for ag in agent_ids(wave)},
+                "utilities": {ag: 0.0 for ag in negotiators(wave)},
                 "totals": {"delay_min": 0.0, "fuel_kg": 0.0, "hold_min": 0.0, "pax_protected_pct": 0.0,
                            "overtime_min": 0.0, "diversions": 0}}
     mm = _metrics_map(wave, plan)
@@ -202,5 +234,5 @@ def evaluate(wave: Wave, plan: JointPlan) -> dict:
     return {"plan_id": plan.id,
             "feasible": all(c.passed for c in checks),
             "checks": [c.to_dict() for c in checks],
-            "utilities": {ag: agent_utility(wave, plan, ag, mm) for ag in agent_ids(wave)},
+            "utilities": {ag: agent_utility(wave, plan, ag, mm) for ag in negotiators(wave)},
             "totals": totals}

@@ -1,33 +1,38 @@
-"""Wave negotiation as a LangGraph state graph (spec §6, §8, §14; contract NegotiationMessage).
+"""Wave negotiation as a LangGraph state graph (challenge rules_of_play; contract v2.0).
 
-    triage -> open -> moves -> counter -> check -> vote -> decide_round -+-> finalize
-                        ^                                                +-> concede -> moves
-                        +------------------------------------------------+-> fallback -> finalize
+    triage -> open -> atc -> pilot -> ground -> decide_turn -+-> finalize          (consensus)
+                       ^                                     +-> atc               (next turn)
+                       +-------------------------------------+-> fallback -> finalize (after turn 3)
 
-Independent agents (ATC, one PILOT per wave flight, GROUND) each start from the round's table plan
-and make up to 2 moves (3 when triage severity >= 3) inside their own authority (moves.legal_moves).
-Every decision goes through a per-agent `Decider` (model chain -> local formula); the agent only
-sees its private view. The deterministic rule engine (rules.check) is the only judge of legality.
+Exactly three agents negotiate (challenge rules_of_play): ATC, PILOT:<focus> (the pilot of the
+disruption flight, wave.focus; if unset the most-delayed disrupted flight) and GROUND. One turn =
+each agent sends ONE structured AGENT_TURN message, in the order ATC -> PILOT -> GROUND; at most
+3 turns. Non-focus flights have no pilot agent: ATC sequences them (runway, slot/holding, plus
+speed control / ground delay as ATC instructions), GROUND assigns their gates, and the engine still
+checks all their rules (fuel, wake, gates...). Every decision goes through a per-agent `Decider`
+(model chain -> local formula); the deterministic rule engine (rules.check) is the only judge of
+legality. Engine messages (TRIAGE, OPEN, CHECK, CONSENSUS, NO_CONSENSUS, FALLBACK, MODEL_FALLBACK)
+are not agent turns.
 
 Choices made here (documented for review):
+- Chaining: in turn t, ATC starts from the incumbent plan, PILOT from ATC's proposal, GROUND from
+  PILOT's proposal. Each agent makes up to 2 moves (3 when triage severity >= 3) and puts the result
+  on the table as its proposal. The engine CHECKs every new proposal right after the agent's message.
 - Move rejection: a move is rejected iff the plan after it has a violation (rule, callsign) that the
-  plan before it did not have. When the table plan is feasible this is exactly
-  `rules.feasible(after) is False`; when the table is already infeasible (common on real waves:
-  FCFS often breaks fuel/gate rules) it still lets agents repair the plan step by step instead of
-  every move being vetoed.
-- Agent formula (Choice fallback / formulas mode): the agent ranks options by (number of violated
-  rules it knows about after the move, -own utility). It knows the rules of its own domain plus every
-  rule the engine has published so far (OPEN/CHECK violations, MOVE_REJECTED). It moves only if
-  that strictly improves (fewer known violations, or same and higher own utility); otherwise a Pilot
-  accepts and ATC/GROUND pass. Cross-domain rules it has not seen yet can still get a move vetoed.
-- Vote formula: step function, P(accept) = 1.0 if utility >= reservation else 0.0 (exactly the
-  "formula verdict" Brier is measured against in spec §14). ACCEPT iff P(accept) >= 0.5.
-- Reservation_r = best own utility seen on a FEASIBLE plan so far (OPEN, counters) * (0.9 - 0.12 * (r - 1)).
-  The round-3 NO_CONSENSUS reports the round-3 reservations (there is no round 4).
-- Plan labels are the per-flight description (JointPlan.describe()); authorship is in sender/rationale.
-- A slot allows at most MAX_REJECTIONS_PER_SLOT picks that the engine vetoes; then the agent's turn ends.
-- Table plan for round r+1: the feasible counter-plan with the highest min-utility; if none is
-  feasible, the counter with the fewest violations (ties: max-min utility); else unchanged.
+  plan before it did not have. Rejections are listed in the agent's AGENT_TURN `rejected` with the
+  violations (rule, source, evidence). A slot allows at most MAX_REJECTIONS_PER_SLOT vetoed picks.
+- Agent formula (Choice fallback / formulas mode): ranks options by (known violated rules after the
+  move, -own utility); moves only on strict improvement; otherwise accepts/passes.
+- Votes: when an agent speaks it votes on every CHECK-passed plan on the table at that moment: the
+  incumbent, the proposals made earlier in this turn and its own proposal. Consensus = one
+  CHECK-passed plan ACCEPTed by all three agents within the same turn (best max-min utility if
+  several). A plan GROUND proposes in turn t can therefore only win from turn t+1 on, as incumbent.
+- Vote formula: P(accept) = 1.0 if utility >= reservation else 0.0; ACCEPT iff P(accept) >= 0.5.
+  Reservation_t = best own utility seen on a FEASIBLE plan so far * (0.9 - 0.12 * (t - 1)).
+- Incumbent for turn t+1: the CHECK-passed plan of turn t (incumbent or proposal) with the highest
+  max-min utility; if none passed, the proposal with the fewest violations.
+- No consensus after turn 3: the deterministic non-AI solver (fallback.solve) decides; FALLBACK.reason
+  says which agent rejected which plan (utility vs reservation) or that no plan passed CHECK.
 - stats.model_calls = decisions answered by a model; stats.fallbacks = Decider fallback events.
 """
 from __future__ import annotations
@@ -44,10 +49,11 @@ from langgraph.graph import END, START, StateGraph
 
 from atm.decide import DEFAULT_CHAIN, Decider, DecisionResult
 from atm.wave import baseline, fallback, moves, rules, wind
-from atm.wave.model import JointPlan, Move, Wave, agent_ids
-from atm.wave.utility import agent_terms, agent_utility, evaluate, metrics
+from atm.wave.model import JointPlan, Move, Wave
+from atm.wave.utility import agent_terms, agent_utility, evaluate, focus_callsign, metrics, negotiators
 
-MAX_ROUNDS = 3
+MAX_TURNS = 3
+MAX_ROUNDS = MAX_TURNS  # back-compat alias
 MOVES_PER_ROUND = 2
 SEVERE_MOVES_PER_ROUND = 3
 SEVERE_LEVEL = 3
@@ -106,7 +112,7 @@ def _known_rules(agent: str, checks, known: set[str]) -> list[str]:
 
 
 def _maxmin(wave: Wave, plan: JointPlan) -> tuple[float, float]:
-    us = [agent_utility(wave, plan, ag) for ag in agent_ids(wave)]
+    us = [agent_utility(wave, plan, ag) for ag in negotiators(wave)]
     return min(us), sum(us) / len(us)
 
 
@@ -177,7 +183,9 @@ class _Run:
         self.fallbacks = 0
         self.model_errors: list[str] = []
         self.known_rules: set[str] = set()
-        self.best_seen: dict[str, float] = {ag: 0.0 for ag in agent_ids(wave)}
+        self.agents = negotiators(wave)
+        self.focus = focus_callsign(wave)
+        self.best_seen: dict[str, float] = {ag: 0.0 for ag in self.agents}
         self.max_moves = MOVES_PER_ROUND
         self.votes: dict[str, list[dict]] = {}
         self.lock = threading.Lock()
@@ -225,10 +233,12 @@ class _Run:
 
 class S(TypedDict, total=False):
     ctx: Any
-    round: int
-    table: Any                  # JointPlan
-    counters: list              # [(agent, JointPlan)]
-    candidates: list            # distinct feasible JointPlans
+    round: int                  # current turn (1..3)
+    table: Any                  # incumbent JointPlan
+    proposals: list             # [(agent, JointPlan)] this turn, in speaking order
+    checked: dict               # plan_id -> (JointPlan, passed) for plans on the table this turn
+    ballots: dict               # agent -> votes this turn
+    fallback_reason: str
     route: str
     final: Any                  # JointPlan
     outcome: str
@@ -299,7 +309,7 @@ def _triage(st: S) -> dict:
         run.max_moves = SEVERE_MOVES_PER_ROUND
     run.emit(run.msg(0, "DECIDER", body,
                      f"Severity {score}/4 (worst delay {worst_delay:g} min, {usable}/{total} runways within "
-                     f"wind limits); {run.max_moves} moves per agent per round", _meta("score", r)))
+                     f"wind limits); up to {run.max_moves} moves per agent per turn", _meta("score", r)))
     return {}
 
 
@@ -311,14 +321,21 @@ def _open(st: S) -> dict:
     run.see(plan)
     run.known_rules |= {c["rule"] for c in ev["checks"] if not c["passed"]}
     nv = sum(not c["passed"] for c in ev["checks"])
-    run.emit(run.msg(0, "ATC", {"type": "OPEN", "plan": plan.to_dict(), "evaluation": ev},
-                     f"First come first served from the real schedule; {nv} rule violation(s) on the table"))
+    run.emit(run.msg(0, "ENGINE", {"type": "OPEN", "plan": plan.to_dict(), "evaluation": ev,
+                                   "agents": run.agents, "focus": run.focus},
+                     f"Opening plan: first come first served from the schedule; {nv} rule violation(s) on the "
+                     f"table; agents {', '.join(run.agents)}"))
     return {"round": 1, "table": plan}
 
 
-def _agent_turn(run: _Run, agent: str, rnd: int, table: JointPlan, known: set[str]) -> tuple[list[dict], JointPlan]:
+def _agent_moves(run: _Run, agent: str, rnd: int, table: JointPlan, known: set[str]
+                 ) -> tuple[list[dict], JointPlan, list[dict], list[dict]]:
+    """The agent's moves for this turn. Returns (MODEL_FALLBACK messages, resulting plan,
+    applied [{move, utility_before, utility_after, decision}], rejected [{move, violations, decision}])."""
     w = run.wave
     buf: list[dict] = []
+    applied: list[dict] = []
+    rejected: list[dict] = []
     dec = run.decider(agent, rnd, buf)
     plan = table
     for _slot in range(run.max_moves):
@@ -340,9 +357,6 @@ def _agent_turn(run: _Run, agent: str, rnd: int, table: JointPlan, known: set[st
             if not avail:
                 stop = True
                 break
-            # Same information the formula ranks on: known violations after the move (own-domain
-            # rules + every rule the engine has published), with the rule names. Informational only:
-            # the engine still vetoes every move independently.
             options = {k: f"{v[0].label} | your utility after {v[3]:.3f} (now {u_now:.3f})"
                           f" | known rule violations after {v[4]} (now {k_now})"
                           + (f": {', '.join(_known_rules(agent, v[2], known))}" if v[4] else "")
@@ -360,7 +374,7 @@ def _agent_turn(run: _Run, agent: str, rnd: int, table: JointPlan, known: set[st
                     return next(k for k, v in avail.items() if v[0].kind == "accept")
                 return PASS
 
-            state = {"role": _role(agent), "agent": agent, "round": rnd, "objective": OBJECTIVES[_role(agent)],
+            state = {"role": _role(agent), "agent": agent, "turn": rnd, "objective": OBJECTIVES[_role(agent)],
                      "view": _view(w, plan, agent),
                      "utility_terms": {k: round(v, 3) for k, v in agent_terms(w, plan, agent).items()},
                      "utility_now": u_now, "reservation": run.reservation(agent, rnd),
@@ -377,29 +391,27 @@ def _agent_turn(run: _Run, agent: str, rnd: int, table: JointPlan, known: set[st
                 stop = True
                 break
             mv, after, chk, u_after, _ = avail[pick]
-            if mv.kind == "accept" and plan is not table:
-                stop = True  # pilot already moved this round: accepting just ends its turn, no extra message
+            if mv.kind == "accept":
+                stop = True  # accepting is a vote, not a move: the turn's moves end here
                 break
             new_v = [c for c in chk if not c.passed and (c.rule, c.callsign) not in before_v]
             if new_v:
                 excluded.add(pick)
                 known |= {c.rule for c in new_v}
-                buf.append(run.msg(rnd, "ENGINE", {"type": "MOVE_REJECTED", "move": mv.to_dict(),
-                                                   "violations": [c.to_dict() for c in new_v]},
-                                   f"Vetoed {agent}'s move: {new_v[0].rule}: {new_v[0].detail}"[:300],
-                                   _choice_meta(r, info)))
+                with run.lock:
+                    run.known_rules |= {c.rule for c in new_v}
+                rejected.append({"move": mv.to_dict(), "violations": [c.to_dict() for c in new_v],
+                                 "reason": f"{new_v[0].rule}: {new_v[0].detail}"[:300],
+                                 "decision": _choice_meta(r, info)})
                 continue
-            buf.append(run.msg(rnd, agent, {"type": "MOVE", "move": mv.to_dict(), "plan": _plan_dict(w, after),
-                                            "options_count": len(options)},
-                               f"{mv.label}: own utility {u_now:.3f} -> {u_after:.3f}", _choice_meta(r, info)))
+            applied.append({"move": mv.to_dict(), "utility_before": u_now, "utility_after": u_after,
+                            "decision": _choice_meta(r, info)})
             plan = after
             moved = True
-            if mv.kind == "accept":
-                stop = True
             break
         if stop or not moved:
             break
-    return buf, plan
+    return buf, plan, applied, rejected
 
 
 def _choice_meta(r: DecisionResult, info: dict) -> dict:
@@ -410,154 +422,171 @@ def _choice_meta(r: DecisionResult, info: dict) -> dict:
     return m
 
 
-def _moves(st: S) -> dict:
+def _votes(run: _Run, agent: str, rnd: int, plans: list[JointPlan]) -> tuple[list[dict], list[dict], dict | None]:
+    """(MODEL_FALLBACK messages, votes, DecisionMeta) for `agent` on the CHECK-passed `plans`."""
+    w = run.wave
+    buf: list[dict] = []
+    res = run.reservation(agent, rnd)
+    if not plans:
+        return buf, [], None
+    us = {p.id: agent_utility(w, p, agent) for p in plans}
+    items = {p.id: f"As {agent}, accept plan {p.id} ({p.describe()[:160]})? Your utility {us[p.id]:.3f}, "
+                   f"your reservation {res:.3f}." for p in plans}
+    state = {"role": _role(agent), "agent": agent, "turn": rnd, "objective": OBJECTIVES[_role(agent)],
+             "reservation": res, "max_turns": MAX_TURNS,
+             "plans": {p.id: {"utility": us[p.id], "terms": {k: round(v, 3) for k, v in
+                                                             agent_terms(w, p, agent).items()}} for p in plans}}
+    rs = run.decider(agent, rnd, buf).noul_batch(state, items, lambda pid: 1.0 if us[pid] >= res else 0.0)
+    first = next(iter(rs.values()))
+    run.account(first)
+    votes = []
+    for p in plans:
+        r = rs[p.id]
+        acc = float(r.value) >= 0.5
+        v = {"plan_id": p.id, "vote": "ACCEPT" if acc else "REJECT", "utility": us[p.id], "reservation": res}
+        if run.mode != "formulas":
+            v["p_accept"] = round(float(r.value), 3)
+        if r.provider == "formula":
+            v["reason"] = f"utility {us[p.id]:.3f} {'>=' if acc else '<'} reservation {res:.3f}"
+        else:
+            v["reason"] = f"{r.model}: P(accept)={float(r.value):.2f} (utility {us[p.id]:.3f}, reservation {res:.3f})"
+        votes.append(v)
+    return buf, votes, _meta("noul", first)
+
+
+def _speak(st: S, agent: str) -> dict:
+    """One agent's turn: moves from the latest plan on the table, one AGENT_TURN message, engine CHECK."""
     run: _Run = st["ctx"]
-    rnd, table = st["round"], st["table"]
-    agents = agent_ids(run.wave)
-    known = set(run.known_rules)
-    with ThreadPoolExecutor(max_workers=len(agents)) as ex:
-        futs = [ex.submit(_agent_turn, run, ag, rnd, table, set(known)) for ag in agents]
-        counters = []
-        for ag, fut in zip(agents, futs):  # emit in protocol order as each agent finishes
-            buf, plan = fut.result()
-            for m in buf:
-                if m["type"] == "MOVE_REJECTED":
-                    run.known_rules |= {v["rule"] for v in m["body"]["violations"]}
-                run.emit(m)
-            counters.append((ag, plan))
-    return {"counters": counters}
+    w = run.wave
+    rnd = st["round"]
+    table: JointPlan = st["table"]
+    props: list = list(st.get("proposals") or [])
+    checked: dict = dict(st.get("checked") or {})
+    if table.id not in checked:
+        checked[table.id] = (table, not rules.violations(w, table))
+    start = props[-1][1] if props else table
+    buf, plan, applied, rejected = _agent_moves(run, agent, rnd, start, set(run.known_rules))
+    for m in buf:
+        run.emit(m)
+    proposal = JointPlan(plan.assignments, "")
+    run.see(proposal)
+    new = proposal.id not in checked
+    viol = rules.violations(w, proposal) if new else None
+    if new:
+        checked[proposal.id] = (proposal, not viol)
+        run.known_rules |= {c.rule for c in viol}
+    # vote on every CHECK-passed plan on the table now: incumbent, earlier proposals this turn, own proposal
+    seen, on_table = set(), []
+    for p in [table] + [q for _, q in props] + [proposal]:
+        if p.id not in seen:
+            seen.add(p.id)
+            on_table.append(p)
+    valid = [p for p in on_table if checked[p.id][1]]
+    vbuf, votes, vmeta = _votes(run, agent, rnd, valid)
+    for m in vbuf:
+        run.emit(m)
+    u = agent_utility(w, proposal, agent)
+    n_acc = sum(v["vote"] == "ACCEPT" for v in votes)
+    if applied:
+        what = "; ".join(x["move"]["label"] for x in applied)
+    else:
+        what = "no move (keeps the plan on the table)"
+    rationale = (f"Turn {rnd}: {what}; {len(rejected)} move(s) vetoed by the engine; own utility {u:.3f}; "
+                 f"accepts {n_acc}/{len(votes)} valid plan(s) at reservation {run.reservation(agent, rnd):.3f}")
+    body = {"type": "AGENT_TURN", "turn": rnd, "agent": agent, "role": _role(agent),
+            "moves": applied, "rejected": rejected,
+            "proposal": _plan_dict(w, proposal), "proposal_utility": u,
+            "votes": votes, "rationale": rationale}
+    if vmeta is not None:
+        body["decision"] = vmeta
+    run.emit(run.msg(rnd, agent, body, rationale, vmeta))
+    if new:
+        nchk = len(rules.check(w, proposal))
+        run.emit(run.msg(rnd, "ENGINE", {"type": "CHECK", "plan_id": proposal.id, "passed": not viol,
+                                         "proposed_by": agent, "violations": [c.to_dict() for c in viol]},
+                         f"{agent}'s proposal passes all {nchk} checks" if not viol else
+                         f"{agent}'s proposal fails {len(viol)} check(s): " + ", ".join(sorted({c.rule for c in viol}))))
+    ballots = dict(st.get("ballots") or {})
+    ballots[agent] = votes
+    props.append((agent, proposal))
+    return {"proposals": props, "checked": checked, "ballots": ballots}
 
 
-def _counter(st: S) -> dict:
+def _atc(st: S) -> dict:
+    return _speak({**st, "proposals": [], "checked": {}, "ballots": {}}, "ATC")
+
+
+def _pilot(st: S) -> dict:
+    return _speak(st, st["ctx"].agents[1])
+
+
+def _ground(st: S) -> dict:
+    return _speak(st, "GROUND")
+
+
+def _no_consensus_reason(run: _Run, rnd: int, checked: dict, ballots: dict) -> str:
+    valid = [pid for pid, (_, ok) in checked.items() if ok]
+    if not valid:
+        return f"turn {rnd}: no plan on the table passed the engine CHECK"
+    parts = []
+    for pid in valid:
+        rej = [f"{ag} (utility {v['utility']:.3f} < reservation {v['reservation']:.3f})"
+               if v["utility"] < v["reservation"] else f"{ag} ({v.get('reason', 'rejected')})"
+               for ag in run.agents for v in ballots.get(ag, []) if v["plan_id"] == pid and v["vote"] == "REJECT"]
+        missing = [ag for ag in run.agents if not any(v["plan_id"] == pid for v in ballots.get(ag, []))]
+        why = []
+        if rej:
+            why.append("rejected by " + ", ".join(rej))
+        if missing:
+            why.append("not yet on the table when " + ", ".join(missing) + " spoke")
+        parts.append(f"plan {pid}: " + "; ".join(why))
+    return f"turn {rnd}: no CHECK-passed plan accepted by all 3 agents (" + " | ".join(parts) + ")"
+
+
+def _decide_turn(st: S) -> dict:
     run: _Run = st["ctx"]
     rnd = st["round"]
-    out = []
-    for ag, plan in st["counters"]:
-        p = JointPlan(plan.assignments, "")
-        ev = evaluate(run.wave, p)
-        run.see(p)
-        u = ev["utilities"][ag]
-        same = p.id == st["table"].id
-        run.emit(run.msg(rnd, ag, {"type": "COUNTER", "plan": p.to_dict(), "evaluation": ev},
-                         ("Keeps the table plan" if same else "Counter-plan") + f"; own utility {u:.3f}"))
-        out.append((ag, p))
-    return {"counters": out}
-
-
-def _check(st: S) -> dict:
-    run: _Run = st["ctx"]
-    rnd = st["round"]
-    seen, cands = set(), []
-    for ag, p in st["counters"]:
-        if p.id in seen:
-            continue
-        seen.add(p.id)
-        v = rules.violations(run.wave, p)
-        run.known_rules |= {c.rule for c in v}
-        run.emit(run.msg(rnd, "ENGINE", {"type": "CHECK", "plan_id": p.id, "passed": not v,
-                                         "violations": [c.to_dict() for c in v]},
-                         f"{ag}'s plan passes all {len(rules.check(run.wave, p))} checks" if not v else
-                         f"{ag}'s plan fails {len(v)} check(s): " + ", ".join(sorted({c.rule for c in v}))))
-        if not v:
-            cands.append(p)
-    return {"candidates": cands}
-
-
-def _vote(st: S) -> dict:
-    run: _Run = st["ctx"]
-    rnd, cands = st["round"], st["candidates"]
-    run.votes = {}
-    if not cands:
-        return {}
     w = run.wave
-    agents = agent_ids(w)
-
-    def one(ag: str):
-        buf: list[dict] = []
-        res = run.reservation(ag, rnd)
-        us = {p.id: agent_utility(w, p, ag) for p in cands}
-        items = {p.id: f"As {ag}, accept plan {p.id} ({p.describe()[:160]})? Your utility {us[p.id]:.3f}, "
-                       f"your reservation {res:.3f}." for p in cands}
-        state = {"role": _role(ag), "agent": ag, "round": rnd, "objective": OBJECTIVES[_role(ag)],
-                 "reservation": res, "max_rounds": MAX_ROUNDS,
-                 "plans": {p.id: {"utility": us[p.id], "terms": {k: round(v, 3) for k, v in
-                                                                 agent_terms(w, p, ag).items()}} for p in cands}}
-        rs = run.decider(ag, rnd, buf).noul_batch(state, items, lambda pid: 1.0 if us[pid] >= res else 0.0)
-        return buf, res, us, rs
-
-    with ThreadPoolExecutor(max_workers=len(agents)) as ex:
-        futs = [ex.submit(one, ag) for ag in agents]
-        for ag, fut in zip(agents, futs):
-            buf, res, us, rs = fut.result()
-            for m in buf:
-                run.emit(m)
-            first = next(iter(rs.values()))
-            run.account(first)
-            votes = []
-            for p in cands:
-                r = rs[p.id]
-                acc = float(r.value) >= 0.5
-                v = {"plan_id": p.id, "decision": "ACCEPT" if acc else "REJECT", "utility": us[p.id],
-                     "reservation": res}
-                if run.mode != "formulas":
-                    v["p_accept"] = round(float(r.value), 3)
-                if r.provider == "formula":
-                    v["reason"] = f"utility {us[p.id]:.3f} {'>=' if acc else '<'} reservation {res:.3f}"
-                else:
-                    v["reason"] = f"{r.model}: P(accept)={float(r.value):.2f} (utility {us[p.id]:.3f}, reservation {res:.3f})"
-                votes.append(v)
-            run.votes[ag] = votes
-            n_acc = sum(v["decision"] == "ACCEPT" for v in votes)
-            run.emit(run.msg(rnd, ag, {"type": "VOTE", "votes": votes},
-                             f"Accepts {n_acc}/{len(votes)} plan(s) at reservation {res:.3f}", _meta("noul", first)))
-    return {}
-
-
-def _decide_round(st: S) -> dict:
-    run: _Run = st["ctx"]
-    rnd, cands = st["round"], st["candidates"]
-    w = run.wave
-    agents = agent_ids(w)
-    votes = run.votes if cands else {}
-    unanimous = [p for p in cands if all(any(v["plan_id"] == p.id and v["decision"] == "ACCEPT"
-                                             for v in votes.get(ag, [])) for ag in agents)]
+    agents = run.agents
+    checked, ballots = st["checked"], st["ballots"]
+    valid = [p for p, ok in checked.values() if ok]
+    unanimous = [p for p in valid if all(any(v["plan_id"] == p.id and v["vote"] == "ACCEPT"
+                                             for v in ballots.get(ag, [])) for ag in agents)]
     if unanimous:
         best = max(unanimous, key=lambda p: (*_maxmin(w, p), p.id))
         if rules.feasible(w, best):
-            run.emit(run.msg(rnd, "ENGINE", {"type": "CONSENSUS", "plan_id": best.id, "accepted_by": agents},
-                             f"All {len(agents)} agents accept {best.id}; max-min utility {_maxmin(w, best)[0]:.3f} "
-                             f"among {len(unanimous)} unanimous plan(s)"))
+            run.emit(run.msg(rnd, "ENGINE", {"type": "CONSENSUS", "plan_id": best.id, "turn": rnd,
+                                             "accepted_by": agents},
+                             f"Turn {rnd}: all 3 agents accept {best.id}; max-min utility "
+                             f"{_maxmin(w, best)[0]:.3f} among {len(unanimous)} unanimous plan(s)"))
             return {"route": "finalize", "final": best, "outcome": "consensus", "method": "consensus"}
-    # after the last round there is no next round: report the reservations that applied in this one
-    nxt = {ag: run.reservation(ag, rnd + 1 if rnd < MAX_ROUNDS else rnd) for ag in agents}
-    run.emit(run.msg(rnd, "ENGINE", {"type": "NO_CONSENSUS", "valid_plan_ids": [p.id for p in cands],
-                                     "next_reservation": nxt},
-                     f"No plan accepted by all agents ({len(cands)} valid plan(s))"
-                     + ("; agents concede" if rnd < MAX_ROUNDS else "; round limit reached")))
-    return {"route": "concede" if rnd < MAX_ROUNDS else "fallback"}
-
-
-def _concede(st: S) -> dict:
-    run: _Run = st["ctx"]
-    w = run.wave
-    table = st["table"]
-    plans = [p for _, p in st["counters"]]
-    feas = [p for p in plans if rules.feasible(w, p)]
-    if feas:
-        table = max(feas, key=lambda p: (*_maxmin(w, p), p.id))
-    elif plans:
+    reason = _no_consensus_reason(run, rnd, checked, ballots)
+    last = rnd >= MAX_TURNS
+    nxt = {ag: run.reservation(ag, rnd if last else rnd + 1) for ag in agents}
+    run.emit(run.msg(rnd, "ENGINE", {"type": "NO_CONSENSUS", "turn": rnd, "valid_plan_ids": [p.id for p in valid],
+                                     "next_reservation": nxt, "reason": reason},
+                     (reason + ("; turn limit reached" if last else "; agents concede"))[:400]))
+    if last:
+        return {"route": "fallback", "fallback_reason": reason}
+    # incumbent for the next turn
+    if valid:
+        table = max(valid, key=lambda p: (*_maxmin(w, p), p.id))
+    else:
+        plans = [p for _, p in st["proposals"]]
         table = min(plans, key=lambda p: (len(rules.violations(w, p)), -_maxmin(w, p)[0], p.id))
-    return {"round": st["round"] + 1, "table": table}
+    return {"route": "next", "round": rnd + 1, "table": table}
 
 
 def _fallback(st: S) -> dict:
     run: _Run = st["ctx"]
     plan, method = fallback.solve(run.wave)
-    reason = (f"No consensus after {MAX_ROUNDS} rounds" if st.get("outcome") != "unsafe"
-              else "Agreed plan failed the final safety check")
-    run.emit(run.msg(min(st.get("round", MAX_ROUNDS), MAX_ROUNDS), "ENGINE",
+    if st.get("outcome") == "unsafe":
+        reason = "the agreed plan failed the final safety check"
+    else:
+        reason = f"No consensus within {MAX_TURNS} turns: " + (st.get("fallback_reason") or "no unanimous plan")
+    run.emit(run.msg(min(st.get("round", MAX_TURNS), MAX_TURNS), "ENGINE",
                      {"type": "FALLBACK", "plan_id": plan.id, "method": method, "reason": reason},
-                     f"Deterministic solver (no AI): {method}"))
+                     f"Deterministic solver (no AI) decides: {method}. Why: {reason}"[:500]))
     return {"final": plan, "outcome": "fallback", "method": method}
 
 
@@ -575,23 +604,59 @@ def _finalize(st: S) -> dict:
 
 def build_graph():
     g = StateGraph(S)
-    for name, fn in [("triage", _triage), ("open", _open), ("moves", _moves), ("counter", _counter),
-                     ("check", _check), ("vote", _vote), ("decide_round", _decide_round),
-                     ("concede", _concede), ("fallback", _fallback), ("finalize", _finalize)]:
+    for name, fn in [("triage", _triage), ("open", _open), ("atc", _atc), ("pilot", _pilot),
+                     ("ground", _ground), ("decide_turn", _decide_turn), ("fallback", _fallback),
+                     ("finalize", _finalize)]:
         g.add_node(name, fn)
     g.add_edge(START, "triage")
     g.add_edge("triage", "open")
-    g.add_edge("open", "moves")
-    g.add_edge("moves", "counter")
-    g.add_edge("counter", "check")
-    g.add_edge("check", "vote")
-    g.add_edge("vote", "decide_round")
-    g.add_conditional_edges("decide_round", lambda st: st["route"],
-                            {"finalize": "finalize", "concede": "concede", "fallback": "fallback"})
-    g.add_edge("concede", "moves")
+    g.add_edge("open", "atc")
+    g.add_edge("atc", "pilot")
+    g.add_edge("pilot", "ground")
+    g.add_edge("ground", "decide_turn")
+    g.add_conditional_edges("decide_turn", lambda st: st["route"],
+                            {"finalize": "finalize", "next": "atc", "fallback": "fallback"})
     g.add_edge("fallback", "finalize")
     g.add_edge("finalize", END)
     return g.compile()
+
+
+def _hhmm(window_start: str, minutes: float) -> str:
+    try:
+        t0 = datetime.fromisoformat(window_start)
+    except (TypeError, ValueError):
+        return f"T{minutes:+g}"
+    from datetime import timedelta
+    return (t0 + timedelta(minutes=float(minutes))).strftime("%H:%M")
+
+
+def revision(wave: Wave, plan: JointPlan, focus: str) -> dict:
+    """Challenge output for the disruption flight: revised arrival time, runway, gate and action.
+    delay_vs_schedule_min = landing slot - scheduled arrival (divert: the metrics delay)."""
+    a = plan.get(focus)
+    f = wave.flight(focus)
+    m = metrics(wave, a)
+    if a.action == "divert":
+        alt = (f.fuel or {}).get("alternate")
+        return {"callsign": focus, "action": "divert", "alternate": alt, "revised_arrival": None,
+                "revised_arrival_min": None, "runway": None, "gate": None,
+                "scheduled_arrival": _hhmm(wave.window_start, f.sched_min), "scheduled_gate": f.scheduled_gate,
+                "delay_vs_schedule_min": m.delay_min,
+                "summary": f"{focus} diverts to {alt or 'its alternate'} (delay ~{m.delay_min:g} min)"}
+    action = "ground_delay" if a.ground_delay_min > 0 else "hold" if m.hold_min > 0 else "land"
+    slot = float(a.slot_min)
+    d = round(slot - f.sched_min, 1)
+    hhmm = _hhmm(wave.window_start, slot)
+    extra = (f", ground delay {a.ground_delay_min:g} min" if a.ground_delay_min > 0 else "") + \
+            (f", speed reduction {a.speed_reduction_min:g} min" if a.speed_reduction_min > 0 else "") + \
+            (f", holding {m.hold_min:g} min" if m.hold_min > 0 else "")
+    return {"callsign": focus, "action": action, "revised_arrival": hhmm, "revised_arrival_min": slot,
+            "revised_arrival_t": f"T{slot:+g}", "runway": a.runway, "gate": a.gate,
+            "scheduled_arrival": _hhmm(wave.window_start, f.sched_min), "scheduled_gate": f.scheduled_gate,
+            "speed_reduction_min": a.speed_reduction_min, "ground_delay_min": a.ground_delay_min,
+            "hold_min": m.hold_min, "delay_vs_schedule_min": d,
+            "summary": f"{focus} lands {hhmm} local (T{slot:+g}) on runway {a.runway}, gate {a.gate}"
+                       f"{extra}; {d:+g} min vs schedule"}
 
 
 _GRAPH = None
@@ -615,7 +680,9 @@ def negotiate_wave(wave: Wave, mode: str, chain: list[str] | None = None,
     result = {
         "run_id": run.run_id, "wave_id": wave.id, "mode": mode,
         "model": run.chain[0] if run.chain else "formula",
-        "outcome": st["outcome"], "rounds": min(st["round"], MAX_ROUNDS),
+        "outcome": st["outcome"], "rounds": min(st["round"], MAX_TURNS), "turns": min(st["round"], MAX_TURNS),
+        "agents": run.agents, "focus": run.focus,
+        "revision": revision(wave, plan, run.focus), "limits": rules.limits_for(wave),
         "final_plan": plan.to_dict(), "evaluation": ev,
         "baseline": {"plan": None, "evaluation": evaluate(wave, base)},
         "narration": None,

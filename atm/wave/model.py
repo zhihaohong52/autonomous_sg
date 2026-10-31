@@ -128,6 +128,13 @@ class Wave(_Dict):
     gates: list[Gate]
     provenance: list[Provenance] = field(default_factory=list)
     severity: dict | None = None
+    focus: str | None = None   # callsign of the disruption row's flight (omitted from JSON when None)
+
+    def to_dict(self) -> dict:
+        d = asdict(self)
+        if d["focus"] is None:
+            del d["focus"]
+        return d
 
     def flight(self, callsign: str) -> WaveFlight:
         return next(f for f in self.flights if f.callsign == callsign)

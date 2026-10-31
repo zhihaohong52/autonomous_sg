@@ -1,7 +1,9 @@
 """FCFS opening plan, legal moves per agent (spec §6 authority) and pure move application.
 
 Authority is enforced here, legality in rules.py:
-  * ATC changes runway / slot / landing order only (and may re-slot other flights on the strip).
+  * ATC changes runway / slot / landing order (and may re-slot other flights on the strip); for
+    flights without a pilot agent (every flight except wave.focus) it also issues speed control
+    (airborne) or a ground delay (not yet airborne) as ATC instructions.
   * PILOT:<cs> changes only its own flight (speed reduction, ground delay, divert, accept); the
     flight is placed at its own earliest wake-legal slot with every other slot fixed.
   * GROUND changes gates only.
@@ -14,7 +16,7 @@ from dataclasses import replace
 from atm.wave import rules, wind
 from atm.wave.model import Assignment, FlightMetrics, JointPlan, Move, Wave
 from atm.wave.rules import has_slot, reciprocal, strip_of, strip_sequence, wake_gap_min, weather_factor
-from atm.wave.utility import TURNAROUND_MIN, agent_utility, metrics
+from atm.wave.utility import agent_utility, metrics, turnaround_min
 
 MAX_MOVES = 12
 SPEED_REDUCTIONS = (3.0, 5.0, 8.0)
@@ -25,7 +27,7 @@ PILOT_SEARCH_MIN = 60.0        # a Pilot's own-slot search horizon
 CALM_KT = 3.0                  # at or below: wind gives no runway preference, follow the queue
 
 AUTHORITY = {
-    "ATC": {"swap_order", "change_runway", "shift_slot"},
+    "ATC": {"swap_order", "change_runway", "shift_slot", "speed_reduction", "ground_delay"},
     "PILOT": {"speed_reduction", "ground_delay", "request_divert", "accept"},
     "GROUND": {"reassign_gate", "remote_stand", "swap_gates"},
 }
@@ -215,24 +217,41 @@ def _candidates(wave: Wave, plan: JointPlan, agent_id: str) -> list[Move]:
                     continue   # never offer landing against the flow already in use on that strip
                 mv.append(_move("ATC", "change_runway", [a.callsign], {"runway": rw},
                                 f"Move {a.callsign} from {a.runway} to runway {rw}"))
-            if has_slot(a):
+            if a.runway and has_slot(a):
                 for d in SHIFT_STEPS:
                     mv.append(_move("ATC", "shift_slot", [a.callsign], {"minutes": d},
                                     f"Shift {a.callsign} slot {d:+g} min"))
+            if a.callsign != getattr(wave, "focus", None) and a.runway and has_slot(a):
+                # one ATC absorption instruction per holding non-focus flight: the smallest step that
+                # covers its airborne hold (speed control if airborne, ground delay if not)
+                f = _flight(wave, a.callsign)
+                hold = metrics(wave, a).hold_min
+                if hold > 0:
+                    steps = SPEED_REDUCTIONS if f.airborne else GROUND_DELAYS
+                    v = next((x for x in steps if x >= hold), steps[-1])
+                    cur = a.speed_reduction_min if f.airborne else a.ground_delay_min
+                    if v > cur:
+                        if f.airborne:
+                            mv.append(_move("ATC", "speed_reduction", [a.callsign], {"minutes": v},
+                                            f"ATC speed control: {a.callsign} absorbs {v:g} min en route"))
+                        else:
+                            mv.append(_move("ATC", "ground_delay", [a.callsign], {"minutes": v},
+                                            f"ATC ground delay: {a.callsign} holds {v:g} min at {f.origin}"))
     elif role == "GROUND":
         gates = {g.id: g for g in wave.gates}
         mm = {a.callsign: metrics(wave, a) for a in landing}
+        turn = turnaround_min(wave)
         for a in landing:
             f = _flight(wave, a.callsign)
             ib = mm[a.callsign].in_block_min or 0.0
-            end = ib + TURNAROUND_MIN
+            end = ib + turn
             for g in wave.gates:
                 if g.remote or g.id == a.gate or (f.gate_size == "wide" and g.size != "wide"):
                     continue
                 if any(b["from_min"] < end and ib < b["to_min"] for b in g.busy):
                     continue
                 if any(o.gate == g.id and o is not a and (mm[o.callsign].in_block_min or 0) < end
-                       and ib < (mm[o.callsign].in_block_min or 0) + TURNAROUND_MIN for o in landing):
+                       and ib < (mm[o.callsign].in_block_min or 0) + turn for o in landing):
                     continue
                 mv.append(_move("GROUND", "reassign_gate", [a.callsign], {"gate": g.id},
                                 f"Reassign {a.callsign} from gate {a.gate} to {g.id}"))
@@ -255,7 +274,7 @@ def _candidates(wave: Wave, plan: JointPlan, agent_id: str) -> list[Move]:
         cs = agent_id.split(":", 1)[1]
         a = plan.get(cs)
         f = _flight(wave, cs)
-        if a.action == "land":
+        if a.action == "land" and a.runway and has_slot(a):
             if f.airborne:
                 for v in SPEED_REDUCTIONS:
                     if v != a.speed_reduction_min:
@@ -266,6 +285,7 @@ def _candidates(wave: Wave, plan: JointPlan, agent_id: str) -> list[Move]:
                     if v != a.ground_delay_min:
                         mv.append(_move(agent_id, "ground_delay", [cs], {"minutes": v},
                                         f"{cs} takes {v:g} min ground delay at {f.origin}"))
+        if a.action == "land":
             alt = (f.fuel or {}).get("alternate") or "alternate"
             mv.append(_move(agent_id, "request_divert", [cs], {"alternate": str(alt)},
                             f"{cs} requests diversion to {alt}"))
@@ -308,6 +328,8 @@ def _validate(wave: Wave, plan: JointPlan, move: Move) -> None:
         raise ValueError(f"unknown agent {agent!r}")
     if k not in AUTHORITY[role]:
         raise ValueError(f"{agent} has no authority for move kind {k!r} (allowed: {sorted(AUTHORITY[role])})")
+    if role == "ATC" and k in ("speed_reduction", "ground_delay") and cs and cs[0] == getattr(wave, "focus", None):
+        raise ValueError(f"ATC may not set {k} for {cs[0]}: that flight's pilot agent owns it")
     need = 2 if k in ("swap_order", "swap_gates") else 1
     if len(cs) != need or len(set(cs)) != need:
         raise ValueError(f"{k} needs {need} distinct callsign(s), got {cs}")

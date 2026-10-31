@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 MODEL = os.environ.get("NARRATION_MODEL", "claude-opus-5-5")
 MAX_WORDS = 120
 MAX_LINES = 40
-KEY_TYPES = ("TRIAGE", "OPEN", "MOVE", "MOVE_REJECTED", "CHECK", "CONSENSUS", "NO_CONSENSUS", "FALLBACK",
+KEY_TYPES = ("TRIAGE", "OPEN", "AGENT_TURN", "CHECK", "CONSENSUS", "NO_CONSENSUS", "FALLBACK",
              "MODEL_FALLBACK")
 
 
@@ -42,7 +42,8 @@ def _compact(result: dict) -> dict:
     ev, base = result["evaluation"], result["baseline"]["evaluation"]
     failed = [c for c in base.get("checks", []) if not c["passed"]]
     return {
-        "wave_id": result["wave_id"], "outcome": result["outcome"], "rounds": result["rounds"],
+        "wave_id": result["wave_id"], "outcome": result["outcome"], "turns": result.get("turns", result["rounds"]),
+        "agents": result.get("agents"), "revision": (result.get("revision") or {}).get("summary"),
         "final_plan": result["final_plan"]["label"],
         "assignments": [{k: a.get(k) for k in ("callsign", "action", "runway", "slot_min", "gate",
                                                 "speed_reduction_min", "ground_delay_min")}
@@ -54,7 +55,7 @@ def _compact(result: dict) -> dict:
                                                 for c in failed][:8]},
         "model_fallbacks": result["stats"].get("fallbacks", 0),
         "model_errors": result.get("model_errors", [])[:3],
-        "key_messages": [f"R{m['round']} {m['sender']} {m['type']}: {m['rationale']}"[:200]
+        "key_messages": [f"T{m['round']} {m['sender']} {m['type']}: {m['rationale']}"[:200]
                          for m in _key_messages(result)],
     }
 
@@ -62,8 +63,11 @@ def _compact(result: dict) -> dict:
 def _template(result: dict) -> dict:
     ev, base = result["evaluation"], result["baseline"]["evaluation"]
     t, b = ev["totals"], base["totals"]
-    how = (f"All agents agreed in round {result['rounds']}" if result["outcome"] == "consensus"
-           else f"No agreement after {result['rounds']} rounds; the deterministic solver chose the plan")
+    how = (f"ATC, pilot and ground agreed in turn {result['rounds']}" if result["outcome"] == "consensus"
+           else f"No agreement after {result['rounds']} turns; the deterministic solver chose the plan")
+    rev = (result.get("revision") or {}).get("summary")
+    if rev:
+        how = f"{rev}. {how}"
     base_v = sum(not c["passed"] for c in base.get("checks", []))
     risks = []
     if t["diversions"]:
@@ -77,7 +81,7 @@ def _template(result: dict) -> dict:
              f"{b['fuel_kg']:g}, connections protected {t['pax_protected_pct']:g}% vs {b['pax_protected_pct']:g}%. "
              f"Status quo had {base_v} rule violation(s). Risks: {', '.join(risks) or 'none flagged'}. "
              "Approve or override the plan.")
-    lines = [f"Round {m['round']}, {m['sender']} ({m['type'].lower().replace('_', ' ')}): {m['rationale']}"
+    lines = [f"Turn {m['round']}, {m['sender']} ({m['type'].lower().replace('_', ' ')}): {m['rationale']}"
              for m in _key_messages(result)]
     return {"source": "template", "brief": _trim(brief), "lines": lines}
 

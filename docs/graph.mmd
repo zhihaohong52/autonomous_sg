@@ -7,27 +7,23 @@ graph TD;
 	__start__([<p>__start__</p>]):::first
 	triage(triage)
 	open(open)
-	moves(moves)
-	counter(counter)
-	check(check)
-	vote(vote)
-	decide_round(decide_round)
-	concede(concede)
+	atc(atc)
+	pilot(pilot)
+	ground(ground)
+	decide_turn(decide_turn)
 	fallback(fallback)
 	finalize(finalize)
 	__end__([<p>__end__</p>]):::last
 	__start__ --> triage;
-	check --> vote;
-	concede --> moves;
-	counter --> check;
-	decide_round -.-> concede;
-	decide_round -.-> fallback;
-	decide_round -.-> finalize;
+	atc --> pilot;
+	decide_turn -. &nbsp;next&nbsp; .-> atc;
+	decide_turn -.-> fallback;
+	decide_turn -.-> finalize;
 	fallback --> finalize;
-	moves --> counter;
-	open --> moves;
+	ground --> decide_turn;
+	open --> atc;
+	pilot --> ground;
 	triage --> open;
-	vote --> decide_round;
 	finalize --> __end__;
 	classDef default fill:#f2f0ff,line-height:1.2
 	classDef first fill-opacity:0

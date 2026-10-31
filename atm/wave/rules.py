@@ -11,11 +11,18 @@ from collections import Counter
 
 from atm.wave import wind
 from atm.wave.model import FlightMetrics, JointPlan, RuleCheck, Wave
-from atm.wave.utility import MAX_SPEED_REDUCTION_MIN, TURNAROUND_MIN, fuel_info, metrics, taxi_min
+from atm.wave.utility import MAX_SPEED_REDUCTION_MIN, fuel_info, metrics, taxi_min, turnaround_min
 
-SRC_WAKE = "ICAO Doc 4444 wake turbulence separation (time-based approximation)"
-SRC_FUEL = "14 CFR 121.639 reserve + alternate"
+SRC_WB = "challenge2_operational_constraints.xlsx"
+SRC_WAKE = f"{SRC_WB} wake_separation (min_time_s, simplified FAA JO 7110.65)"
+SRC_FUEL = f"{SRC_WB} fuel_and_crew (final reserve 30 min) + 14 CFR 121.639 alternate"
 SRC_OPS = "ops rule"
+SRC_CAP = f"{SRC_WB} airport_capacity (max_runway_ops_per_hour / active_runways)"
+SRC_TURN = f"{SRC_WB} airport_capacity (min_turnaround_min)"
+SRC_NOTICE = f"{SRC_WB} fuel_and_crew (gate change notice >= 20 min before arrival)"
+SRC_CREW = f"{SRC_WB} fuel_and_crew (ground crew shift 8 h, overtime 1.5x)"
+GATE_NOTICE_MIN = 20.0
+OVERTIME_MULT = 1.5
 SRC_RWY = "airport runway status"
 WET_VIS_SM = 3.0
 WEATHER_FACTOR_BAD = 1.25
@@ -23,14 +30,66 @@ _RWY_RE = re.compile(r"^(\d{1,2})([LRC]?)$")
 
 
 def wake_gap_min(leader: str, follower: str) -> float:
-    """Minimum time (min) between a leader and a follower landing on the same runway (dry)."""
-    if leader == "SUPER":
-        return 4.0
-    if leader == "HEAVY" and follower in ("LARGE", "B757", "SMALL"):
-        return 3.0
-    if leader == "B757" and follower in ("LARGE", "SMALL"):
-        return 2.5
-    return 2.0
+    """Minimum time (min) between a leader and a follower landing on the same runway (dry), from the
+    workbook wake_separation sheet (min_time_s / 60; B757 is treated as Heavy by constraints.py)."""
+    from atm.wave import constraints
+    return constraints.wake_s(leader, follower) / 60.0
+
+
+def capacity_per_runway_h(wave: Wave) -> tuple[float, object]:
+    """Workbook arrival cap per runway per hour = max_runway_ops_per_hour / active_runways."""
+    from atm.wave import constraints
+    lim = constraints.airport(wave.airport.iata)
+    return lim.max_runway_ops_per_hour / max(lim.active_runways, 1), lim
+
+
+# --------------------------------------------------------------- limits stated (rules_of_play)
+LIMITS = [
+    {"limit": "wake separation (same runway)", "value": "Super->any 180 s, Heavy->any 120 s, Large->Small 60 s, "
+     "any other pair 60 s", "source": "workbook", "note": "workbook min_time_s (labelled departures) applied to "
+     "arrivals on the same physical runway (both ends)"},
+    {"limit": "B757 wake category", "value": "Heavy", "source": "assumption",
+     "note": "workbook has no B757 row; treated as Heavy (conservative)"},
+    {"limit": "wet-runway / low-visibility separation factor", "value": "x1.25", "source": "assumption",
+     "note": "added on top of workbook wake times when METAR shows wet surface or visibility < 3 SM"},
+    {"limit": "final fuel reserve", "value": "30 min", "source": "workbook", "note": "never planned below; "
+     "hold allowed only up to the extra fuel above alternate + final reserve"},
+    {"limit": "holding fuel burn", "value": "narrowbody 2400 kg/h, widebody 6500 kg/h", "source": "workbook",
+     "note": "by gate size class of the aircraft"},
+    {"limit": "contingency fuel 5% of trip", "value": "not modelled", "source": "assumption",
+     "note": "no trip fuel in the data; holding fuel is checked against extra fuel instead"},
+    {"limit": "spare fuel on arrival", "value": "45 min of holding (workbook default) unless the wave states it",
+     "source": "workbook", "note": "fuel.extra_min of each flight as built by the wave builder"},
+    {"limit": "flight crew max duty", "value": "13 h from report time (not enforced)", "source": "assumption",
+     "note": "not enforced: crew report time is not in flights.csv, so no PLT-CREW-DUTY rule"},
+    {"limit": "ground crew shift / overtime", "value": "8 h shift, overtime cost x1.5", "source": "workbook",
+     "note": "overtime is allowed (GND-CREW-DUTY reports it, never vetoes) and costs 1.5x in Ground utility; "
+     "changed from v1 where any overtime was illegal"},
+    {"limit": "gate change notice", "value": ">= 20 min before arrival", "source": "workbook",
+     "note": "decision time is T0: a flight landing before T+20 keeps its scheduled gate; the remote stand "
+     "is exempt (assumption, always staffed)"},
+    {"limit": "runway capacity", "value": "arrivals per runway per rolling 60 min <= max_runway_ops_per_hour / "
+     "active_runways", "source": "workbook", "note": "applied to every real physical runway (strip); "
+     "fixed queue arrivals count but only wave flights can be vetoed"},
+    {"limit": "runways and wind", "value": "real runway ids, headings and METAR", "source": "real data",
+     "note": "real runways are used instead of the workbook active_runways count, which is only the divisor "
+     "of the capacity cap; crosswind/tailwind limits from FAA Order 8400.9 / AFM"},
+    {"limit": "turnaround / gate occupancy", "value": "airport min_turnaround_min", "source": "workbook",
+     "note": "45 min at large hubs, 35 min at medium/small hubs"},
+]
+
+
+def limits_for(wave: Wave) -> list[dict]:
+    """LIMITS plus the airport-specific workbook values used for this wave."""
+    cap, lim = capacity_per_runway_h(wave)
+    return LIMITS + [{"limit": f"{lim.iata} airport limits", "value":
+                      f"{lim.size_class}: active_runways {lim.active_runways}, max_runway_ops_per_hour "
+                      f"{lim.max_runway_ops_per_hour} -> {cap:g} arrivals/runway/h, min_turnaround "
+                      f"{lim.min_turnaround_min} min, gates {lim.gates}, spare gates {lim.spare_gates}",
+                      "source": "workbook",
+                      "note": f"real runways at {wave.airport.icao}: "
+                              f"{len({strip_of(r.id) for r in wave.airport.runways})} physical "
+                              f"({', '.join(r.id for r in wave.airport.runways)})"}]
 
 
 def weather_factor(wave: Wave) -> float:
@@ -165,6 +224,7 @@ def _wake_checks(wave: Wave, plan: JointPlan) -> dict[str, RuleCheck]:
 
 def _gate_free_checks(wave: Wave, plan: JointPlan, mm: dict[str, FlightMetrics]) -> dict[str, RuleCheck]:
     out: dict[str, RuleCheck] = {}
+    turn = turnaround_min(wave)
     gates = {g.id: g for g in wave.gates}
     landing = [a for a in plan.assignments if a.action == "land"]
     for a in landing:
@@ -175,8 +235,8 @@ def _gate_free_checks(wave: Wave, plan: JointPlan, mm: dict[str, FlightMetrics])
                                         f"{a.callsign}: unknown gate {a.gate!r} or no in-block time", SRC_OPS,
                                         {"gate": str(a.gate)}, a.callsign)
             continue
-        end = ib + TURNAROUND_MIN
-        ev = {"gate": g.id, "need_from_min": ib, "need_to_min": round(end, 1)}
+        end = ib + turn
+        ev = {"gate": g.id, "need_from_min": ib, "need_to_min": round(end, 1), "turnaround_min": turn}
         if g.remote:
             out[a.callsign] = RuleCheck("GND-GATE-FREE", "GROUND", True,
                                         f"Remote stand {g.id} has unlimited positions", SRC_OPS, ev, a.callsign)
@@ -191,8 +251,8 @@ def _gate_free_checks(wave: Wave, plan: JointPlan, mm: dict[str, FlightMetrics])
                 if o is a or o.gate != g.id:
                     continue
                 oib = mm[o.callsign].in_block_min
-                if oib is not None and oib < end and ib < oib + TURNAROUND_MIN:
-                    clash = (o.callsign, oib, oib + TURNAROUND_MIN)
+                if oib is not None and oib < end and ib < oib + turn:
+                    clash = (o.callsign, oib, oib + turn)
                     break
         if clash:
             ev.update({"conflict": str(clash[0]), "conflict_from_min": clash[1], "conflict_to_min": round(clash[2], 1)})
@@ -201,6 +261,39 @@ def _gate_free_checks(wave: Wave, plan: JointPlan, mm: dict[str, FlightMetrics])
         else:
             detail = f"Gate {g.id} free T{ib:+g}..T{end:+g}"
         out[a.callsign] = RuleCheck("GND-GATE-FREE", "GROUND", clash is None, detail, SRC_OPS, ev, a.callsign)
+    return out
+
+
+def _capacity_checks(wave: Wave, plan: JointPlan) -> dict[str, RuleCheck]:
+    """ATC-RWY-CAPACITY: landings on the flight's physical runway in the rolling 60 min ending at its
+    slot (queue + wave, itself included) <= workbook cap. Only wave flights can fail; the fixed queue
+    counts toward the load."""
+    per_h, lim = capacity_per_runway_h(wave)
+    allowed = int(math.floor(per_h + 1e-9))
+    out: dict[str, RuleCheck] = {}
+    seqs: dict[tuple, list] = {}
+    for a in plan.assignments:
+        if a.action != "land":
+            continue
+        if not (a.runway and has_slot(a)):
+            out[a.callsign] = RuleCheck("ATC-RWY-CAPACITY", "ATC", False, f"{a.callsign}: no runway/slot",
+                                        SRC_CAP, {"runway": str(a.runway), "slot_min": str(a.slot_min)},
+                                        a.callsign)
+            continue
+        key = strip_of(a.runway)
+        if key not in seqs:
+            seqs[key] = strip_sequence(wave, plan, a.runway)
+        t = float(a.slot_min)
+        n = sum(1 for x in seqs[key] if t - 60.0 < x[0] <= t)
+        ok = n <= allowed
+        out[a.callsign] = RuleCheck(
+            "ATC-RWY-CAPACITY", "ATC", ok,
+            f"{a.callsign}: {n} landings on runway {'/'.join(key)} in the 60 min to T{t:+g} "
+            f"{'<=' if ok else '>'} cap {allowed} ({lim.max_runway_ops_per_hour} ops/h / "
+            f"{lim.active_runways} active runways, {lim.size_class})",
+            SRC_CAP, {"runway": a.runway, "strip": "/".join(key), "landings_60min": n, "cap_per_runway_h": allowed,
+                      "max_runway_ops_per_hour": lim.max_runway_ops_per_hour,
+                      "active_runways": lim.active_runways}, a.callsign)
     return out
 
 
@@ -232,6 +325,8 @@ def check(wave: Wave, plan: JointPlan, mm: dict[str, FlightMetrics] | None = Non
     wake = _wake_checks(wave, plan)
     gfree = _gate_free_checks(wave, plan, mm)
     opposite = direction_conflicts(wave, plan)
+    cap = _capacity_checks(wave, plan)
+    turn = turnaround_min(wave)
     metar = wave.metar
     out: list[RuleCheck] = []
     for a in plan.assignments:
@@ -351,15 +446,36 @@ def check(wave: Wave, plan: JointPlan, mm: dict[str, FlightMetrics] | None = Non
         # GND-GATE-FREE
         out.append(gfree[cs])
 
-        # GND-CREW-DUTY
-        ok = m.overtime_min <= 0
-        turn_end = (m.in_block_min or 0) + TURNAROUND_MIN
+        # GND-GATE-NOTICE (workbook: gate change decided >= 20 min before arrival; decision time T0)
+        if g is not None:
+            changed = a.gate != f.scheduled_gate
+            arr = float(a.slot_min) if slot_ok else float("nan")
+            late = changed and not g.remote and not (slot_ok and arr >= GATE_NOTICE_MIN)
+            if not changed:
+                det = f"{cs}: keeps scheduled gate {a.gate}"
+            elif g.remote:
+                det = f"{cs}: moved {f.scheduled_gate} -> remote stand {g.id} (remote stand exempt from notice)"
+            else:
+                det = (f"{cs}: gate change {f.scheduled_gate} -> {g.id} decided at T+0, arrival T{arr:+g} "
+                       f"({'>=' if not late else '<'} {GATE_NOTICE_MIN:g} min notice)")
+            out.append(RuleCheck("GND-GATE-NOTICE", "GROUND", not late, det, SRC_NOTICE,
+                                 {"scheduled_gate": f.scheduled_gate, "gate": g.id,
+                                  "arrival_min": arr if slot_ok else "none", "notice_min": GATE_NOTICE_MIN,
+                                  "remote": "yes" if g.remote else "no"}, cs))
+
+        # GND-CREW-DUTY (workbook: overtime after the 8 h shift is allowed and costs 1.5x)
+        turn_end = (m.in_block_min or 0) + turn
+        over = m.overtime_min
         out.append(RuleCheck(
-            "GND-CREW-DUTY", "GROUND", ok,
+            "GND-CREW-DUTY", "GROUND", True,
             f"{cs}: turnaround ends T{turn_end:+g}, crew shift ends T{f.crew_shift_end_min:+g}"
-            + ("" if ok else f" ({m.overtime_min:g} min overtime)"),
-            SRC_OPS, {"turnaround_end_min": round(turn_end, 1), "crew_shift_end_min": f.crew_shift_end_min,
-                      "overtime_min": m.overtime_min}, cs))
+            + (f" ({over:g} min overtime at x{OVERTIME_MULT:g} cost = {over * OVERTIME_MULT:g} paid min)"
+               if over > 0 else " (no overtime)"),
+            SRC_CREW, {"turnaround_end_min": round(turn_end, 1), "crew_shift_end_min": f.crew_shift_end_min,
+                       "overtime_min": over, "overtime_mult": OVERTIME_MULT}, cs))
+
+        # ATC-RWY-CAPACITY
+        out.append(cap[cs])
     return out
 
 

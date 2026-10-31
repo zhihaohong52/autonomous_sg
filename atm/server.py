@@ -144,7 +144,7 @@ RUNS_MAX = 200
 RUNS: OrderedDict[str, dict] = OrderedDict()  # LRU; older runs are served from disk
 
 
-V2_PREFIXES = ("/api/waves", "/api/wave/", "/api/negotiate-wave", "/api/runs/", "/api/benchmark")
+V2_PREFIXES = ("/api/waves", "/api/flights", "/api/wave/", "/api/negotiate-wave", "/api/runs/", "/api/benchmark")
 
 
 @app.exception_handler(RequestValidationError)
@@ -281,6 +281,13 @@ def _sse(event: str, data) -> str:
 @app.get("/api/waves")
 def waves(airport: str | None = None, q: str | None = None, limit: int = 50):
     return WB.list_waves(airport=airport, q=q, limit=max(0, min(limit, 500)))
+
+
+@app.get("/api/flights")
+def flights_2015(airport: str | None = None, q: str | None = None, limit: int = 50, offset: int = 0):
+    from .wave import flights2015
+    rows, total = flights2015.search(airport=airport, q=q, limit=max(0, min(limit, 500)), offset=max(0, offset))
+    return {"flights": rows, "total": total}
 
 
 @app.get("/api/waves/random")

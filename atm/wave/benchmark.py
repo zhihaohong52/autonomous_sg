@@ -163,7 +163,7 @@ def brier(results: list[dict]) -> float:
     errs = []
     for r in results:
         for m in r["log"]:
-            if m["type"] != "VOTE" or (m.get("decision") or {}).get("provider", "formula") == "formula":
+            if m["type"] not in ("VOTE", "AGENT_TURN") or (m.get("decision") or {}).get("provider", "formula") == "formula":
                 continue
             for v in m["body"]["votes"]:
                 if "p_accept" in v:

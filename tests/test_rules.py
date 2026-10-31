@@ -27,15 +27,15 @@ def test_wake_violation_detected():
               AA302=dict(runway="26R", slot_min=8.0), UA403=dict(runway="26R", slot_min=12.0))
     c = _by(rules.check(w, p), "ATC-WAKE-SEP", "DL201")
     assert not c.passed
-    assert c.evidence["leader"] == "DL100" and c.evidence["required_behind_min"] == 3.0
-    assert c.source.startswith("ICAO Doc 4444")
+    assert c.evidence["leader"] == "DL100" and c.evidence["required_behind_min"] == 2.0  # workbook Heavy->Large 120 s
+    assert c.source.startswith("challenge2_operational_constraints.xlsx")
     assert _by(rules.check(w, p), "ATC-WAKE-SEP", "DL100").passed
     assert not rules.feasible(w, p)
 
 
 def test_wake_violation_against_queue_follower():
     w = make_wave()   # F99 (queue) lands 26R at T+10
-    p = _plan(w, AA302=dict(runway="26R", slot_min=9.0))
+    p = _plan(w, AA302=dict(runway="26R", slot_min=9.5))
     c = _by(rules.check(w, p), "ATC-WAKE-SEP", "AA302")
     assert not c.passed and c.evidence["follower"] == "F99"
 
@@ -43,8 +43,8 @@ def test_wake_violation_against_queue_follower():
 def test_wet_weather_factor():
     w = make_wave(queue=[])
     w = replace(w, metar=replace(w.metar, surface="wet"))
-    # 3 min behind a HEAVY is legal dry but needs 3.75 wet
-    p = _plan(w, DL100=dict(runway="27L", slot_min=5.0), DL201=dict(runway="27L", slot_min=8.0))
+    # 2 min behind a HEAVY is legal dry (workbook 120 s) but needs 2.5 wet
+    p = _plan(w, DL100=dict(runway="27L", slot_min=5.0), DL201=dict(runway="27L", slot_min=7.0))
     assert not _by(rules.check(w, p), "ATC-WAKE-SEP", "DL201").passed
 
 
@@ -130,7 +130,8 @@ def test_evaluate_shape():
     assert set(ev) == {"plan_id", "feasible", "checks", "utilities", "totals"}
     assert ev["plan_id"] == p.id
     assert set(ev["totals"]) == {"delay_min", "fuel_kg", "hold_min", "pax_protected_pct", "overtime_min", "diversions"}
-    assert set(ev["utilities"]) == set(agent_ids(w))
+    from atm.wave.utility import negotiators
+    assert set(ev["utilities"]) == set(negotiators(w)) and len(ev["utilities"]) == 3
     assert {"ATC", "GROUND"} <= set(ev["utilities"]) and all(0 <= u <= 1 for u in ev["utilities"].values())
     keys = {"rule", "owner", "passed", "detail", "source", "evidence", "callsign"}
     assert all(set(c) == keys for c in ev["checks"])
@@ -138,7 +139,8 @@ def test_evaluate_shape():
         assert all(isinstance(v, (str, int, float)) and not isinstance(v, bool) for v in c["evidence"].values()), c
     rules_seen = {c["rule"] for c in ev["checks"]}
     assert rules_seen == {"ATC-RWY-OPEN", "ATC-WAKE-SEP", "ATC-TAXI-ROUTE", "ATC-WIND-LIMITS", "PLT-EARLIEST-ETA",
-                          "PLT-FUEL-RESERVE", "GND-GATE-SIZE", "GND-GATE-FREE", "GND-CREW-DUTY"}
+                          "PLT-FUEL-RESERVE", "GND-GATE-SIZE", "GND-GATE-FREE", "GND-CREW-DUTY",
+                          "GND-GATE-NOTICE", "ATC-RWY-CAPACITY"}
     assert all(a.metrics.in_block_min is not None for a in p.assignments)
 
 
@@ -178,7 +180,7 @@ def test_opposite_ends_rejected():
     cs = rules.check(w2, p2)
     assert not _by(cs, "ATC-RWY-OPEN", "DL100").passed
     wk = _by(cs, "ATC-WAKE-SEP", "DL100")
-    assert not wk.passed and wk.evidence["leader"] == "Q1" and wk.evidence["required_behind_min"] == 4.0
+    assert not wk.passed and wk.evidence["leader"] == "Q1" and wk.evidence["required_behind_min"] == 3.0
 
 
 def test_divert_needs_alternate():

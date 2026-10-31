@@ -449,6 +449,12 @@ def _queue(w: pd.DataFrame, runways: list[Runway], rwinds: list) -> list[QueueAr
 # ---------------------------------------------------------------- public API
 
 def build_wave(wave_id: str) -> Wave:
+    if wave_id.startswith("F2015-"):
+        from atm.wave import flights2015   # lazy: flights2015 imports this module
+        try:
+            return flights2015.build_from_row(int(wave_id[6:]))
+        except ValueError:
+            raise KeyError(wave_id) from None
     iata, date, hour = _parse_id(wave_id)
     row = _index_row(wave_id)
     w = _window_rows(iata, date, hour)
@@ -481,9 +487,10 @@ def build_wave(wave_id: str) -> Wave:
          else Provenance("gates", "generic", "generic layout A1-A5, B1-B5")),
         Provenance("gate_occupancy", "simulated", "seeded model", f"seed={wave_id}"),
     ]
+    focus = max((f for f in flights if f.disrupted), key=lambda f: f.delays["arr_delay"], default=None)
     return Wave(id=wave_id, airport=airport, window_start=f"{date}T{hour:02d}:00:00",
                 metar=metar, runway_wind=rwinds, queue=_queue(rest, runways, rwinds),
-                flights=flights, gates=gates, provenance=prov)
+                flights=flights, gates=gates, provenance=prov, focus=focus.callsign if focus else None)
 
 
 def _summary(row: dict) -> dict:
