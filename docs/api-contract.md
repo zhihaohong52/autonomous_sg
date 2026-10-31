@@ -34,7 +34,7 @@ interface Provenance {
   layer: "flights" | "queue" | "runways" | "weather" | "aircraft" | "gates" | "fuel" | "crew" | "connections" | "gate_occupancy";
   status: "real" | "simulated" | "generic";   // generic = template used because real data missing
   source: string;                            // e.g. "BTS On-Time 2024-07", "METAR KATL 151651Z", "FAA Registry"
-  detail?: string;
+  detail?: string | null;
 }
 ```
 
@@ -61,6 +61,9 @@ v1 single-flight endpoints (`/api/negotiate`, `/api/random`, …) stay as they a
 ```ts
 interface Config {
   version: string;
+  jev_available?: boolean;            // legacy v1 flag, still sent
+  model?: string;                     // narration model id (legacy v1 field)
+  policies?: string[]; n_disruptions?: number;   // legacy v1 fields
   modes: Mode[];                       // available modes
   default_mode: Mode;
   models: ModelInfo[];                 // decision models, benchmark winner first
@@ -127,7 +130,7 @@ interface WaveScenario {
   queue: QueueArrival[];               // fixed real traffic in the window (not negotiated)
   flights: WaveFlight[];               // negotiated flights
   gates: Gate[];
-  severity?: Triage;                   // filled once a negotiation has triaged it
+  severity?: Triage | null;                 // filled once a negotiation has triaged it
   focus: string | null;                // v2.0: callsign of the disruption flight (its pilot is the PILOT agent);
                                        // null => the engine uses the most-delayed disrupted flight
   provenance: Provenance[];            // per layer for the whole wave
@@ -144,7 +147,7 @@ interface Runway {
   heading_true: number;                // degrees
   length_ft: number;
   open: boolean;
-  closed_reason?: string;              // "crosswind 24 kt exceeds FAA 8400.9 §6d (wet, 15 kt)"
+  closed_reason?: string | null;            // "crosswind 24 kt exceeds FAA 8400.9 §6d (wet, 15 kt)"
   // for the stretch map:
   le_lat?: number; le_lon?: number; he_lat?: number; he_lon?: number;
 }
@@ -413,6 +416,7 @@ interface DecisionRequest { run_id: string; decision: "APPROVE" | "OVERRIDE"; no
 ```ts
 interface BenchmarkReport {
   generated_at: string; n_waves: number; seed: number;
+  n_common?: number; wave_ids?: string[]; source?: string;   // waves every arm finished; sampled ids; bts | flights2015
   arms: {
     model: string; provider: string; label: string;
     summary: {
@@ -422,8 +426,12 @@ interface BenchmarkReport {
       agreement_with_formula_pct: number; brier: number | null;
       latency_p50_ms: number | null; latency_p95_ms: number | null; error_rate_pct: number; cost_usd_per_wave: number;
     };
+    delay_min_vs_feasible_status_quo?: number;   // arm mean delay on waves where status quo is legal
+    n_ok?: number; failed_ids?: string[]; p95_all_ms?: number | null; model_decisions?: number;
   }[];
-  baseline: { delay_min: number; fuel_kg: number; pax_protected_pct: number; overtime_min: number; diversions: number };
+  baseline: { delay_min: number; fuel_kg: number; pax_protected_pct: number; overtime_min: number; diversions: number;
+    n_feasible?: number; infeasible_ids?: string[];   // status quo legal on n_feasible waves
+    feasible_only?: { delay_min: number; fuel_kg: number; pax_protected_pct: number; overtime_min: number; diversions: number } };
   ablation_no_engine_unsafe_pct: number | null;   // null = not run
   outage_test: { primary_disabled: string; waves: number; resolved: number; fallbacks_used: Record<string, number> };
   selection: { winner: string; rule: string; reasons: string[] };
