@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: disruption-negotiator
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    autoDeploy: true
+    healthCheckPath: /api/config
+    envVars:
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: TYPESAFE_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
