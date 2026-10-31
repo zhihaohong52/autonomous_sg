@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import baseline, negotiation, scenario
+from . import baseline, jev, negotiation, scenario
 
 ROOT = Path(__file__).resolve().parent.parent
 WEB = ROOT / "web"
@@ -32,7 +32,8 @@ def _summary(fid: int) -> dict:
 @app.get("/api/config")
 def config():
     return {"llm_available": bool(os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")),
-            "model": negotiation.MODEL, "n_disruptions": len(scenario.disruptions())}
+            "jev_available": jev.available(), "model": negotiation.MODEL,
+            "policies": ["rule", "jev", "jev+claude", "llm"], "n_disruptions": len(scenario.disruptions())}
 
 
 @app.get("/api/disruptions")

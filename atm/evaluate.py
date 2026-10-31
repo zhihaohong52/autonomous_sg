@@ -1,7 +1,7 @@
 """Batch evaluation over real disrupted flights.
 
     python -m atm.evaluate --n 500            # decision-model agents (no API key needed)
-    python -m atm.evaluate --n 500 --llm 20   # plus 20 flights with LLM agents
+    python -m atm.evaluate --n 500 --compare jev --compare-n 50   # plus 50 flights with Jev decisions
 
 Compares, per flight:
   * negotiated plan (3 agents + engine)
@@ -131,7 +131,8 @@ def report(res: dict) -> str:
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--n", type=int, default=500)
-    ap.add_argument("--llm", type=int, default=0)
+    ap.add_argument("--compare", default="", help="extra policy to evaluate: jev | jev+claude | llm")
+    ap.add_argument("--compare-n", type=int, default=50)
     ap.add_argument("--seed", type=int, default=7)
     a = ap.parse_args()
     ids = disruptions().id.tolist()
@@ -142,11 +143,18 @@ def main():
     summary, base = summarise(rows)
     res = {"n": len(rows), "policy": "rule", "population": len(ids), "seed": a.seed, "summary": summary,
            "baseline": base, "failures": failures(rows), "runtime_s": round(time.time() - t, 1)}
-    if a.llm:
-        llm_rows = [run_one(i, "llm") for i in sample[: a.llm]]
-        ls, lb = summarise(llm_rows)
-        res["llm"] = {"n": len(llm_rows), "model": negotiation.MODEL, "summary": ls, "baseline": lb,
-                      "failures": failures(llm_rows)}
+    if a.compare:
+        sub = sample[: a.compare_n]
+        crows = [run_one(i, a.compare) for i in sub]
+        cs, cb = summarise(crows)
+        rule_by_id = {r["flight_id"]: r for r in rows}
+        same = sum(r["plan"] == rule_by_id[r["flight_id"]]["plan"] for r in crows)
+        rs, _ = summarise([rule_by_id[i] for i in sub])
+        res["compare"] = {"policy": a.compare, "n": len(crows), "summary": cs, "baseline": cb,
+                          "rule_on_same_flights": rs,
+                          "same_final_plan_as_rule_pct": round(100 * same / len(crows), 1),
+                          "flights_with_model_errors": sum(bool(r["llm_errors"]) for r in crows),
+                          "failures": failures(crows)}
     (OUT / "results.json").write_text(json.dumps(res, indent=1, default=str))
     (OUT / "rows.json").write_text(json.dumps(rows, default=str))
     (OUT / "REPORT.md").write_text(report(res))

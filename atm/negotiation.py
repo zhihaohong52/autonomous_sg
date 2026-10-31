@@ -26,6 +26,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from . import jev
 from . import plans as P
 from .scenario import Scenario
 
@@ -158,6 +159,15 @@ def negotiate(sc: Scenario, policy: str = "rule", engine: bool = True) -> dict:
     rejected: set[str] = set()
     best_own = {a: (_pool(sc, cands, a, set(), set(), 1) or [(0.5, None)])[0][0] for a in P.AGENTS}
     llm_errors = []
+    use_jev = policy.startswith("jev")
+    bonus = 0
+    if use_jev:
+        try:
+            sev = jev.severity(sc)
+            log.append(Msg(0, "JEV", "TRIAGE", sev, f"Jev Score: disruption severity {sev['score']}"))
+            bonus = 2 if _num(sev["score"]) >= 4 else 0
+        except Exception as e:
+            llm_errors.append(f"Jev severity: {e}")
 
     def reservation(a, r):
         return round(best_own[a] * (0.9 - CONCESSION * (r - 1)), 3)
@@ -165,10 +175,22 @@ def negotiate(sc: Scenario, policy: str = "rule", engine: bool = True) -> dict:
     for r in range(1, MAX_ROUNDS + 1):
         # ---- PROPOSE (agents act independently, in parallel)
         def propose(a):
-            pool = _pool(sc, cands, a, known_rules, rejected, 12 if policy == "llm" else SHORTLIST[r])
+            k = 12 if policy == "llm" else 8 if use_jev else SHORTLIST[r]
+            pool = _pool(sc, cands, a, known_rules, rejected, k + bonus)
             pool = [(u, p) for u, p in pool if u >= reservation(a, r)] or pool[:1]
-            ids = [p.id for _, p in pool[:SHORTLIST[r]]]
+            ids = [p.id for _, p in pool[:SHORTLIST[r] + bonus]]
             why = f"Top plans by my decision model (reservation {reservation(a, r)})."
+            extra = {}
+            if use_jev and pool:
+                try:
+                    out = jev.choose(sc, a, private_view(sc, a), OBJECTIVES[a], pool, _fmt_log(log))
+                    ids = out["ranked"][:SHORTLIST[r] + bonus]
+                    extra = {"jev": out}
+                    conf = out["confidence"]
+                    why = (f"Jev Choice picked {out['choice']} (p={out['probabilities'].get(out['choice'], 0):.2f}"
+                           + (f", confidence {conf:.2f}" if isinstance(conf, (int, float)) else "") + ").")
+                except Exception as e:
+                    llm_errors.append(f"R{r} {a} Jev choose: {e}")
             if policy == "llm":
                 try:
                     out = _llm(_system(a), _proposal_prompt(sc, a, r, pool, log, reservation(a, r)), ProposalOut)
@@ -180,13 +202,13 @@ def negotiate(sc: Scenario, policy: str = "rule", engine: bool = True) -> dict:
                         llm_errors.append(f"R{r} {a}: proposed no valid ids {out.plan_ids}")
                 except Exception as e:  # deterministic policy stands in; logged, never silent
                     llm_errors.append(f"R{r} {a} propose: {e}")
-            return a, ids, why
+            return a, ids, why, extra
 
         with ThreadPoolExecutor(3) as ex:
             props = list(ex.map(propose, P.AGENTS))
         on_table: dict[str, str] = {}
-        for a, ids, why in props:
-            log.append(Msg(r, a, "PROPOSE", {"plan_ids": ids,
+        for a, ids, why, extra in props:
+            log.append(Msg(r, a, "PROPOSE", {"plan_ids": ids, **extra,
                                              "plans": [P.plan_card(sc, P.parse_plan(sc, i), False) for i in ids]}, why))
             for i in ids:
                 on_table.setdefault(i, a)
@@ -217,7 +239,18 @@ def negotiate(sc: Scenario, policy: str = "rule", engine: bool = True) -> dict:
                                f"utility {u} < reservation {reservation(a, r)}; worst term {min(terms, key=terms.get)}")})
             why = "Decision-model vote."
             others = [i for i in items if on_table[i["plan_id"]] != a]
-            if policy == "llm" and others:
+            if use_jev and others:
+                try:
+                    out = jev.accept(sc, a, private_view(sc, a), OBJECTIVES[a], [i["plan_id"] for i in others])
+                    for it in others:
+                        pa = out["p"][it["plan_id"]]
+                        it["p_accept"] = round(pa, 3)
+                        it["decision"] = "ACCEPT" if pa >= jev.ACCEPT_THRESHOLD else "REJECT"
+                        it["reason"] = f"Jev P(accept)={pa:.2f}; decision-model score {it['utility']}"
+                    why = f"Jev Noul vote, accept if P >= {jev.ACCEPT_THRESHOLD} ({out['latency_s']}s)."
+                except Exception as e:
+                    llm_errors.append(f"R{r} {a} Jev vote: {e}")
+            elif policy == "llm" and others:
                 try:
                     out = _llm(_system(a), _vote_prompt(sc, a, r, others, log, reservation(a, r)), VoteOut)
                     by_id = {v.plan_id: v for v in out.votes}
@@ -255,6 +288,13 @@ def negotiate(sc: Scenario, policy: str = "rule", engine: bool = True) -> dict:
     return _result(sc, policy, log, pid, "fallback", MAX_ROUNDS, t0, llm_errors)
 
 
+def _num(x) -> float:
+    try:
+        return float(x)
+    except (TypeError, ValueError):
+        return 0.0
+
+
 def _fairness(sc, pid):
     us = [P.utility(sc, P.parse_plan(sc, pid), a)[0] for a in P.AGENTS]
     return (min(us), sum(us))
@@ -270,10 +310,35 @@ def fallback(sc: Scenario, cands=None) -> tuple[str, str]:
     return best.id, f"Deterministic solver: max-min utility over {len(ok)} feasible plans."
 
 
+class Narration(BaseModel):
+    lines: list[str] = Field(description="One short plain-English line per agent message, in log order, "
+                                         "prefixed with the round and agent, e.g. 'R1 PILOT: ...'")
+    brief: str = Field(description="Three-sentence brief for the airline duty manager: what happened, the agreed "
+                                   "plan and its trade-offs, and anything they should double-check")
+
+
+def narrate(sc: Scenario, log: list[dict], plan_label: str, outcome: str) -> dict:
+    """Claude writes the human-readable story of the negotiation. It decides nothing; on any
+    failure a template brief is used instead."""
+    tmpl = (f"{sc.callsign} {sc.flight['origin']}->{sc.flight['dest']}: {', '.join(sc.disruption)}. "
+            f"Outcome: {outcome}, plan '{plan_label}'. All 8 safety rules pass for this plan.")
+    try:
+        compact = [{k: m[k] for k in ("round", "sender", "type", "rationale")} |
+                   {"summary": _fmt_log([Msg(**{**m, "ts": 0})])} for m in log if m["type"] != "CHECK" or not m["body"]["passed"]]
+        out = _llm("You write concise operational summaries for an airline hub duty manager. Use only facts "
+                   "present in the log; do not add numbers that are not in it.",
+                   f"Negotiation log: {compact}\nFinal plan: {plan_label} ({outcome}).", Narration)
+        return {"source": "claude", "model": MODEL, "lines": out.lines, "brief": out.brief}
+    except Exception as e:
+        return {"source": "template", "error": str(e)[:200], "lines": [], "brief": tmpl}
+
+
 def _result(sc, policy, log, pid, outcome, rounds, t0, llm_errors):
     plan = P.parse_plan(sc, pid)
-    return {"flight_id": sc.flight["id"], "policy": policy, "outcome": outcome, "rounds": rounds,
-            "plan": P.plan_card(sc, plan), "log": [asdict(m) for m in log],
+    logd = [asdict(m) for m in log]
+    narration = narrate(sc, logd, plan.label(), outcome) if policy == "jev+claude" else None
+    return {"narration": narration,"flight_id": sc.flight["id"], "policy": policy, "outcome": outcome, "rounds": rounds,
+            "plan": P.plan_card(sc, plan), "log": logd,
             "violations_in_final": [asdict(c) for c in P.constraints(sc, plan) if not c.passed],
             "elapsed_s": round(time.time() - t0, 2), "llm_errors": llm_errors}
 
