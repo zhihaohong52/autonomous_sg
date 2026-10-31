@@ -231,3 +231,13 @@ td .sub { display: block; font-size: var(--fs-small); color: var(--muted); line-
   .settings summary { max-width: calc(100vw - 48px); }
   .gantt { min-width: 980px; }               /* scrolls sideways at a readable size instead of shrinking */
 }
+/* the revision for the disruption flight leads the outcome card */
+.revision { padding-bottom: 18px; margin-bottom: 18px; border-bottom: 1px solid var(--border); }
+.revision .label { font-size: var(--fs-small); color: var(--muted); }
+.revision .what { font-size: 22px; letter-spacing: -0.01em; margin-top: 2px; }
+.revision .delta { font-size: 13px; color: var(--muted); margin-top: 2px; }
+.picklist { display: grid; max-height: 280px; overflow-y: auto; margin: 0 -8px; }
+.picklist button { display: flex; justify-content: space-between; gap: 12px; padding: 8px; border: 0; border-radius: var(--radius-control); background: none; text-align: left; cursor: pointer; font-size: 13px; }
+.picklist button:hover { background: var(--raised); }
+.settings .menu.wide { width: 380px; }
+@media (max-width: 760px) { .settings .menu, .settings .menu.wide { width: calc(100vw - 32px); position: fixed; left: 16px; top: auto; } }

@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, isOffline } from "./api/client";
-import type { Config, JointPlan, Mode, NegotiationMessage, NegotiationResult, WaveScenario, WaveSummary } from "./api/types";
+import type { Config, FlightRow, JointPlan, Mode, NegotiationMessage, NegotiationResult, WaveScenario, WaveSummary } from "./api/types";
 import { Gantt, GanttLegend, type Rejection } from "./components/Gantt";
 import { Log } from "./components/Log";
-import { Checks, Outcome, PlanTable, Sources, Weather } from "./components/Panels";
+import { Checks, Limits, Outcome, PlanTable, RevisionLine, Sources, Weather } from "./components/Panels";
 import { clock, dateLabel } from "./format";
 
 type Status = "idle" | "running" | "done" | "error";
@@ -72,7 +72,15 @@ export function WaveScreen() {
           const m = ev.data;
           setMessages((xs) => [...xs, m]);
           const b = m.body;
-          if (b.type === "OPEN" || b.type === "MOVE" || b.type === "COUNTER") showTable(b.plan);
+          if (b.type === "AGENT_TURN") {
+            const r = b.rejected[b.rejected.length - 1];
+            if (r) {
+              const cs = r.move.callsigns[0];
+              setRejection({ seq: m.seq, move: r.move, violations: r.violations, runway: tableRef.current?.assignments.find((a) => a.callsign === cs)?.runway });
+            }
+            showTable(b.proposal);
+          }
+          if (b.type === "OPEN" || b.type === "MOVE" || b.type === "COUNTER") showTable(b.plan);   // MOVE, COUNTER: v1 runs
           if (b.type === "MOVE_REJECTED") {
             const cs = b.move.callsigns[0];
             setRejection({ seq: m.seq, move: b.move, violations: b.violations, runway: tableRef.current?.assignments.find((a) => a.callsign === cs)?.runway });
@@ -144,7 +152,7 @@ export function WaveScreen() {
         <div>
           <h1>{wave.airport.iata} arrivals {clock(wave.window_start, 0)}–{clock(wave.window_start, 60)}, {dateLabel(wave.window_start)}</h1>
           <p className="sub">{summary}</p>
-          <p className="sr-only" aria-live="polite">{status === "running" ? `Negotiating, round ${round} of 3` : status === "done" ? "Negotiation finished. The plan is ready to approve or override." : status === "error" ? `Negotiation failed. ${runErr ?? ""}` : ""}</p>
+          <p className="sr-only" aria-live="polite">{status === "running" ? `Negotiating, turn ${round} of 3` : status === "done" ? "Negotiation finished. The plan is ready to approve or override." : status === "error" ? `Negotiation failed. ${runErr ?? ""}` : ""}</p>
         </div>
         <div className="actions">
           {decision ? (
@@ -158,7 +166,7 @@ export function WaveScreen() {
             </>
           ) : (
             <button className="btn primary" onClick={negotiate} disabled={status === "running"}>
-              {status === "running" ? `Negotiating, round ${round}…` : status === "error" ? "Run again" : "Start negotiation"}
+              {status === "running" ? `Negotiating, turn ${round}…` : status === "error" ? "Run again" : "Start negotiation"}
             </button>
           )}
         </div>
@@ -186,6 +194,7 @@ export function WaveScreen() {
             {!waves.some((w) => w.id === wave.id) && <option value={wave.id}>{wave.id}</option>}
           </select>
         </label>
+        <FlightPicker airport={wave.airport.iata} onPick={(id) => loadWave(id)} />
         <button className="btn text" onClick={async () => loadWave((await api.randomWave()).id)}>Random wave</button>
         <details className="settings">
           <summary className="btn text"><span className="lbl">{MODE_LABEL[mode]}{mode !== "formulas" && modelLabel ? ` · ${modelLabel}` : ""}{replay ? " · replay" : ""}</span></summary>
@@ -221,6 +230,7 @@ export function WaveScreen() {
 
       <div className="stack">
         <section className="card" aria-label="Outcome against the status quo">
+          <RevisionLine r={result?.revision ?? null} />
           <Outcome ev={result?.evaluation ?? null} base={result?.baseline.evaluation ?? null} />
         </section>
 
@@ -268,10 +278,10 @@ export function WaveScreen() {
                   </section>
                 )}
                 {runErr && <p style={{ color: "var(--negative)", marginBottom: 10 }}>{runErr} <button className="btn text" onClick={negotiate}>Retry</button></p>}
-                <Log messages={messages} running={status === "running"} pilots={wave.flights.map((f) => f.callsign)} />
+                <Log messages={messages} running={status === "running"} focus={result?.focus ?? wave.focus} />
               </>
             )}
-            {tab === "data" && <><Weather wave={wave} /><Sources wave={wave} /></>}
+            {tab === "data" && <><Limits limits={result?.limits ?? null} /><Weather wave={wave} /><Sources wave={wave} /></>}
           </div>
         </section>
       </div>
@@ -292,13 +302,46 @@ function finding(wave: WaveScenario | null, status: Status, msgs: NegotiationMes
     });
     return (
       <>
-        <b>{r.outcome === "consensus" ? `Agreed in ${r.rounds} round${r.rounds === 1 ? "" : "s"}` : "No consensus; deterministic fallback plan"}</b>, every rule passed:
+        <b>{r.outcome === "consensus" ? `Agreed in turn ${r.turns ?? r.rounds} of 3` : "No consensus after 3 turns; the deterministic solver decided"}</b>, every rule passed:
         {" "}gate delay {e.delay_min} min against {b.delay_min} for the status quo{broken.length ? `, which breaks ${broken.map((c) => `${c.rule} on ${c.callsign}`).join(", ")}` : ""}.
         {worse.length ? <> <span className="neg">Worse than status quo: {worse.join("; ")}.</span></> : " No flight is worse off."}
       </>
     );
   }
-  if (status === "running" && msgs.length) return `Round ${msgs[msgs.length - 1].round} of 3 · ${msgs.length} messages so far.`;
+  if (status === "running" && msgs.length) return `Turn ${msgs[msgs.length - 1].round} of 3 · ${msgs.length} messages so far.`;
   const dis = wave.flights.filter((f) => f.disrupted).map((f) => f.callsign);
-  return `${wave.flights.length} flights to negotiate, ${dis.length} disrupted (${dis.join(", ")}); ${wave.queue.length} other arrivals fixed. ${wave.metar ? `${wave.metar.raw.split(" ").slice(2, 5).join(" ")}, ${wave.metar.surface} runways.` : ""}`;
+  return `${wave.focus ? `Disruption flight ${wave.focus}; its pilot negotiates with ATC and Ground. ` : ""}${wave.flights.length} flights in the plan, ${dis.length} disrupted (${dis.join(", ")}); ${wave.queue.length} other arrivals fixed. ${wave.metar ? `${wave.metar.raw.split(" ").slice(2, 5).join(" ")}, ${wave.metar.surface} runways.` : ""}`;
+}
+
+/* Pick the challenge input: one row of flights.csv becomes the wave's disruption flight. */
+function FlightPicker({ airport, onPick }: { airport: string; onPick: (waveId: string) => void }) {
+  const [q, setQ] = useState("");
+  const [rows, setRows] = useState<FlightRow[] | null>(null);
+  const [total, setTotal] = useState(0);
+  const ref = useRef<HTMLDetailsElement>(null);
+  useEffect(() => {
+    const t = setTimeout(() => {
+      api.flights(q, q ? "" : airport).then((r) => { setRows(r.flights); setTotal(r.total); }).catch(() => setRows([]));
+    }, 250);
+    return () => clearTimeout(t);
+  }, [q, airport]);
+  return (
+    <details className="settings" ref={ref}>
+      <summary className="btn text"><span className="lbl">Flight from flights.csv</span></summary>
+      <div className="menu wide">
+        <label className="field">Search by flight, airport or row
+          <input className="select" style={{ backgroundImage: "none", cursor: "text" }} value={q} onChange={(e) => setQ(e.target.value)} placeholder={`For example AA1298, or ${airport}`} />
+        </label>
+        <div className="picklist" role="list">
+          {rows == null ? <p className="muted">Loading…</p> : !rows.length ? <p className="muted">No flights match.</p> : rows.map((r) => (
+            <button key={r.row_id} role="listitem" onClick={() => { ref.current?.removeAttribute("open"); onPick(r.wave_id); }}>
+              <span><span className="code">{r.flight}</span> {r.origin} → {r.dest}</span>
+              <span className="muted">{r.date} {r.sched_arr} · {r.arr_delay > 0 ? `+${r.arr_delay} min` : "on time"}</span>
+            </button>
+          ))}
+        </div>
+        {rows && total > rows.length && <p className="muted" style={{ fontSize: 12 }}>Showing {rows.length} of {total.toLocaleString("en-US")}; search to narrow.</p>}
+      </div>
+    </details>
+  );
 }

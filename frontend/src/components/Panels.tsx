@@ -1,5 +1,5 @@
 import { Fragment, useState } from "react";
-import type { JointPlan, PlanEvaluation, Provenance, RuleCheck, RuleId, WaveFlight, WaveScenario } from "../api/types";
+import type { JointPlan, Limit, PlanEvaluation, Provenance, Revision, RuleCheck, RuleId, WaveFlight, WaveScenario } from "../api/types";
 import { clock, signed } from "../format";
 
 /* ---------- outcome strip: agreed plan against the status quo ---------- */
@@ -33,6 +33,7 @@ const provShort = (p: Provenance[]) => {
 };
 
 export function PlanTable({ wave, plan, baseline }: { wave: WaveScenario; plan: JointPlan | null; baseline: JointPlan | null }) {
+  const focus = wave.focus;
   const c = (m: number | null | undefined) => (m == null ? "—" : clock(wave.window_start, m));
   return (
     <div className="table-wrap" tabIndex={0} role="region" aria-label="Plan per flight">
@@ -51,7 +52,7 @@ export function PlanTable({ wave, plan, baseline }: { wave: WaveScenario; plan: 
             const dPax = a && b ? a.metrics.pax_protected - b.metrics.pax_protected : null;
             return (
               <tr key={f.callsign}>
-                <td title={provShort(f.provenance)}><span className="code">{f.callsign}</span><span className="sub">{f.aircraft_type ?? "—"} from {f.origin}{f.disrupted ? ` · ${Math.max(f.delays.weather, f.delays.late_aircraft)} min ${f.delays.weather >= f.delays.late_aircraft ? "weather" : "late aircraft"}` : ""}</span></td>
+                <td title={provShort(f.provenance)}><span className="code">{f.callsign}</span>{f.callsign === focus && <span className="pill" style={{ marginLeft: 8, height: 20 }}>Disruption flight</span>}<span className="sub">{f.aircraft_type ?? "—"} from {f.origin}{f.disrupted ? ` · ${Math.max(f.delays.weather, f.delays.late_aircraft)} min ${f.delays.weather >= f.delays.late_aircraft ? "weather" : "late aircraft"}` : ""}</span></td>
                 <td>{a ? <><span className="code">{a.action === "divert" ? "Divert" : a.runway}</span><span className="sub">{c(a.slot_min)}{a.metrics.hold_min ? ` · hold ${a.metrics.hold_min} min` : ""}{a.ground_delay_min ? ` · ${a.ground_delay_min} min at ${f.origin}` : ""}</span></> : <span className="muted">—</span>}</td>
                 <td>{a ? <><span className="code">{a.gate}</span><span className="sub">{a.gate !== f.scheduled_gate ? `was ${f.scheduled_gate}` : "scheduled"}</span></> : <span className="code muted">{f.scheduled_gate}</span>}</td>
                 <td className="num">{a ? <>{c(a.metrics.in_block_min)}<span className="sub">{a.metrics.next_dep_delay_min ? `next dep ${a.metrics.next_dep_delay_min} min late` : "next dep on time"}</span></> : <span className="muted">sched {c(f.sched_min)}</span>}</td>
@@ -69,9 +70,9 @@ export function PlanTable({ wave, plan, baseline }: { wave: WaveScenario; plan: 
 /* ---------- rule checks: rules down, flights across ---------- */
 const RULES: { id: RuleId; name: string }[] = [
   { id: "ATC-RWY-OPEN", name: "Runway open" }, { id: "ATC-WAKE-SEP", name: "Wake separation" },
-  { id: "ATC-TAXI-ROUTE", name: "Taxi route" }, { id: "ATC-WIND-LIMITS", name: "Wind limits" },
+  { id: "ATC-TAXI-ROUTE", name: "Taxi route" }, { id: "ATC-WIND-LIMITS", name: "Wind limits" }, { id: "ATC-RWY-CAPACITY", name: "Runway capacity" },
   { id: "PLT-EARLIEST-ETA", name: "Earliest ETA" }, { id: "PLT-FUEL-RESERVE", name: "Fuel reserve" },
-  { id: "GND-GATE-SIZE", name: "Gate size" }, { id: "GND-GATE-FREE", name: "Gate free" }, { id: "GND-CREW-DUTY", name: "Crew duty" },
+  { id: "GND-GATE-SIZE", name: "Gate size" }, { id: "GND-GATE-FREE", name: "Gate free" }, { id: "GND-GATE-NOTICE", name: "Gate change notice" }, { id: "GND-CREW-DUTY", name: "Crew duty" },
 ];
 
 export function Checks({ wave, ev, base }: { wave: WaveScenario; ev: PlanEvaluation | null; base: PlanEvaluation | null }) {
@@ -88,13 +89,13 @@ export function Checks({ wave, ev, base }: { wave: WaveScenario; ev: PlanEvaluat
   return (
     <section>
       <div className="card-head">
-        <h3>{e ? `${e.checks.filter((c) => !c.passed).length ? `${e.checks.filter((c) => !c.passed).length} rule breach${e.checks.filter((c) => !c.passed).length === 1 ? "" : "es"}` : "Every rule passes"} in the ${which === "plan" ? "agreed plan" : "status quo"}` : "Nine rules, every flight"}</h3>
+        <h3>{e ? `${e.checks.filter((c) => !c.passed).length ? `${e.checks.filter((c) => !c.passed).length} rule breach${e.checks.filter((c) => !c.passed).length === 1 ? "" : "es"}` : "Every rule passes"} in the ${which === "plan" ? "agreed plan" : "status quo"}` : "Eleven rules, every flight"}</h3>
         {ev && <div className="seg" role="group" aria-label="Plan to check">
           <button aria-pressed={which === "plan"} onClick={() => { setWhich("plan"); setSel(null); }} disabled={!ev}>Agreed plan</button>
           <button aria-pressed={which === "base"} onClick={() => { setWhich("base"); setSel(null); }} disabled={!base}>Status quo</button>
         </div>}
       </div>
-      {!e ? <p className="empty">Every plan is checked against 9 deterministic rules for every flight. The checks appear once the agents have a plan.</p> : (
+      {!e ? <p className="empty">Every plan is checked against 11 deterministic rules for every flight. The checks appear once the agents have a plan.</p> : (
         <>
           <div className="table-wrap" tabIndex={0} role="region" aria-label="Safety rule checks">
             <table className="matrix" aria-label="Safety rule checks by flight">
@@ -180,6 +181,47 @@ export function Sources({ wave }: { wave: WaveScenario }) {
             <dd><span className={`pill ${p.status === "real" ? "" : "warn"}`} style={{ marginRight: 8 }}>{p.status}</span>{p.source}</dd></Fragment>
         ))}
       </dl>
+    </section>
+  );
+}
+
+/* ---------- the challenge output: the revision for the disruption flight ---------- */
+export function RevisionLine({ r }: { r: Revision | null; }) {
+  if (!r) return null;
+  const what = r.action === "divert" ? `Diverts to ${r.alternate ?? "the alternate"}`
+    : `Lands ${r.revised_arrival} on ${r.runway}, gate ${r.gate}${r.gate !== r.scheduled_gate ? ` (was ${r.scheduled_gate})` : ""}`;
+  const how = [r.speed_reduction_min ? `speed reduction ${r.speed_reduction_min} min` : "", r.ground_delay_min ? `ground delay ${r.ground_delay_min} min` : "", r.hold_min ? `holds ${r.hold_min} min` : ""].filter(Boolean).join(", ");
+  return (
+    <div className="revision">
+      <div className="label">Revision for <span className="code">{r.callsign}</span>, scheduled {r.scheduled_arrival}</div>
+      <div className="what">{what}</div>
+      <div className="delta">{how ? `${how[0].toUpperCase()}${how.slice(1)} · ` : ""}<span className={r.delay_vs_schedule_min > 0 ? "neg" : "pos"}>{signed(r.delay_vs_schedule_min, " min")}</span> vs schedule</div>
+    </div>
+  );
+}
+
+/* ---------- limits used, with where each comes from ---------- */
+export function Limits({ limits }: { limits: Limit[] | null }) {
+  return (
+    <section>
+      <div className="card-head"><h3>Limits used</h3><span className="meta">{limits ? `${limits.filter((l) => l.source !== "assumption").length} of ${limits.length} from the workbook or real data` : ""}</span></div>
+      {!limits ? <p className="empty">Every limit the engine applies, with its source, appears here after a negotiation.</p> : (
+        <div className="table-wrap" tabIndex={0} role="region" aria-label="Limits used">
+          <table>
+            <thead><tr><th>Limit</th><th>Value</th><th>Source</th><th>Note</th></tr></thead>
+            <tbody>
+              {limits.map((l) => (
+                <tr key={l.limit}>
+                  <td>{l.limit}</td>
+                  <td style={{ whiteSpace: "normal", minWidth: 180 }}>{l.value}</td>
+                  <td><span className={`pill${l.source === "assumption" ? " warn" : ""}`}>{l.source}</span></td>
+                  <td className="muted" style={{ whiteSpace: "normal", minWidth: 240, padding: "10px 0 10px 10px" }}>{l.note}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </section>
   );
 }

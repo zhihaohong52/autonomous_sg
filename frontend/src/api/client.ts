@@ -1,16 +1,16 @@
 import type {
-  BenchmarkReport, Config, DecisionRequest, NegotiateRequest, NegotiationEvent, NegotiationResult,
+  BenchmarkReport, Config, DecisionRequest, FlightsResponse, NegotiateRequest, NegotiationEvent, NegotiationResult,
   WaveScenario, WaveSummary,
 } from "./types";
 
-// ?mock=1 forces the offline demo wave; otherwise the mock is used only when the API is unreachable.
+// ?mock=1 forces the offline demo (the backend's recorded sample run); otherwise the mock is used only when the API is unreachable.
 const params = new URLSearchParams(location.search);
 const forceMock = params.has("mock");
 const fast = params.has("fast");                      // replay without delays (screenshots, tests)
 let offline = forceMock;
 export const isOffline = () => offline;
 
-const mock = () => import("../mock/fixture");
+const mock = () => import("../mock/samples");
 
 export class ApiError extends Error {
   constructor(public code: string, message: string, public status = 0) { super(message); }
@@ -44,11 +44,14 @@ export const api = {
   config: () => get<Config>("/api/config", async () => (await mock()).mockConfig, (c) => Array.isArray(c?.modes) && Array.isArray(c?.models)),
   waves: (q = "") => get<WaveSummary[]>(`/api/waves?limit=50${q ? `&q=${encodeURIComponent(q)}` : ""}`, async () => (await mock()).mockWaves),
   randomWave: () => get<WaveSummary>("/api/waves/random", async () => (await mock()).mockWaves[0]),
+  flights: (q = "", airport = "") => get<FlightsResponse>(`/api/flights?limit=30${q ? `&q=${encodeURIComponent(q)}` : ""}${airport ? `&airport=${encodeURIComponent(airport)}` : ""}`, async () => {
+    const f = (await mock()).mockFlights, t = q.trim().toLowerCase();
+    const rows = f.flights.filter((r) => !t || [r.flight, r.origin, r.dest, r.wave_id].some((x) => x.toLowerCase().includes(t)));
+    return { flights: rows, total: rows.length };
+  }),
   wave: (id: string) => get<WaveScenario>(`/api/wave/${encodeURIComponent(id)}`, async () => (await mock()).wave),
   benchmark: () => get<BenchmarkReport>("/api/benchmark", async () => {
-    const b = (await mock()).mockBenchmark;
-    if (!b) throw new ApiError("not_found", "No benchmark generated yet", 404);
-    return b;
+    return (await mock()).mockBenchmark;
   }),
 
   async decision(req: DecisionRequest): Promise<{ ok: true; recorded_at: string }> {
@@ -107,9 +110,9 @@ async function replayMock(onEvent: (e: NegotiationEvent) => void, signal: AbortS
     const t = setTimeout(res, ms);
     signal.addEventListener("abort", () => { clearTimeout(t); rej(new DOMException("aborted", "AbortError")); }, { once: true });
   });
-  onEvent({ event: "start", data: { run_id: mockResult.run_id, wave_id: wave.id, mode: mockResult.mode, model_chain: ["liquid/d1-ultra", "typesafe/jev-1.14", "formula"], started_at: new Date().toISOString() } });
+  onEvent({ event: "start", data: { run_id: mockResult.run_id, wave_id: wave.id, mode: mockResult.mode, model_chain: [mockResult.model], started_at: new Date().toISOString() } });
   for (const m of mockLog) {
-    await wait(m.type === "MOVE" || m.type === "MOVE_REJECTED" ? 700 : 260);
+    await wait(m.type === "AGENT_TURN" ? 900 : 260);
     onEvent({ event: "message", data: m });
   }
   await wait(400);
