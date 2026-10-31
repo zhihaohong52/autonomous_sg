@@ -38,6 +38,61 @@ Keys are optional and live in `.env` (gitignored): `OPENROUTER_API_KEY`, `TYPESA
 
 Input: pick a flight with `GET /api/flights`, id `F2015-<row_id>` (BTS 2024 wave ids still work).
 
+### System
+
+```mermaid
+flowchart LR
+  subgraph DATA["Inputs"]
+    F["flights.csv row<br/>(DOT 2015, the disrupted flight)"]
+    WB["challenge2_operational_constraints.xlsx<br/>(workbook limits)"]
+    REF["Real reference data<br/>runways (OurAirports), METAR (IEM),<br/>gates (OpenStreetMap)"]
+    SIM["Seeded simulation<br/>gate occupancy, fuel, crew, connections"]
+  end
+
+  BUILD["Wave builder<br/>flight + other arrivals that hour<br/>at the destination"]
+  F --> BUILD
+  REF --> BUILD
+  SIM --> BUILD
+
+  subgraph NEG["Negotiation (LangGraph, max 3 turns)"]
+    direction TB
+    ATC["ATC agent<br/>runway, slot, order"]
+    PIL["PILOT agent<br/>own flight: speed, ground delay, divert"]
+    GND["GROUND agent<br/>gates, remote stand"]
+    ATC --> PIL --> GND
+  end
+
+  ENGINE["Rule engine (deterministic)<br/>12 rules, cites source and values<br/>lists legal moves, CHECKs every plan"]
+  DEC["Decision layer: picks a move / votes<br/>formulas (default) or one model:<br/>jev-1.14 → d1-ultra → elephant-1 → formula<br/>(next only on timeout or invalid answer)"]
+  FB["Fallback solver (deterministic)<br/>beam search + safety net<br/>if no consensus after 3 turns"]
+  NAR["Claude Haiku 5.5<br/>writes the duty-manager brief<br/>(explains only, decides nothing)"]
+
+  BUILD --> NEG
+  WB --> ENGINE
+  ENGINE <-->|"legal moves / CHECK"| NEG
+  DEC <-->|"which move? accept?"| NEG
+  NEG -->|"no consensus"| FB
+  FB --> OUT
+  NEG -->|"consensus"| OUT
+  OUT["Result<br/>revised arrival time, runway, gate or diversion<br/>+ per-turn log + limits used"]
+  OUT --> NAR
+
+  subgraph SERVE["Serving"]
+    API["FastAPI + SSE<br/>/api/flights, /api/wave, /api/negotiate-wave"]
+    UI["React dashboard<br/>timeline, per-turn changes, Approve / Override"]
+    MCP["MCP server /mcp/sse (read-only)"]
+  end
+  OUT --> API --> UI
+  NAR --> API
+  API --- MCP
+
+  BENCH["Benchmark (50 seeded rows)<br/>arms: formulas, 3 models, status quo,<br/>centralised optimiser; outage test; engine-off ablation"]
+  BUILD -.-> BENCH
+  NEG -.-> BENCH
+```
+
+### Negotiation graph (exported from LangGraph)
+
 ```mermaid
 ---
 config:

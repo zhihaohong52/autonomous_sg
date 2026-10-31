@@ -114,7 +114,7 @@ export function Log({ messages, running, focus, details = false }: { messages: N
       ["ATC", "atc", "Sees the runways, the queue and the wind. Sequences every flight: landing order, runway, slot, speed control or ground delay."],
       [focus ? `Pilot ${focus}` : "Pilot", "pilot", `Flies the disruption flight${focus ? ` ${focus}` : ""} only: its fuel, ETA and connections. Slows down, takes a ground delay, asks to divert or accepts.`],
       ["Ground", "ground", "Sees gates, stands and crews. Reassigns a gate, sends a flight to a remote stand, swaps gates."],
-      ["Engine", "engine", "Deterministic code, not a model. Checks 11 safety rules on every plan and vetoes any that breaks one."],
+      ["Engine", "engine", "Deterministic code, not a model. Checks 12 safety rules on every plan and vetoes any that breaks one."],
     ];
     return (
       <div>
