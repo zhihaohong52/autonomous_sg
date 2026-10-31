@@ -265,7 +265,7 @@ interface NegotiateRequest {
   wave_id: string;
   mode: Mode;
   model?: string;                      // primary decision model; default = Config.default_model
-  replay?: boolean;                    // true = stream a pre-recorded run, no model calls
+  replay?: boolean;                    // true = stream a pre-recorded run, no model calls; waves without a recording run live
   stream?: boolean;                    // default true
 }
 ```

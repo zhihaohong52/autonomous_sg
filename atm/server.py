@@ -48,6 +48,19 @@ def _summary(fid: int) -> dict:
             "late_aircraft_delay": f.late_aircraft_delay}
 
 
+@app.on_event("startup")
+def _warm() -> None:
+    """Load the flights.csv index and the demo list in the background so the first page load is fast."""
+    def run():
+        try:
+            from .wave import flights2015
+            flights2015._index()
+            _replay_summaries()
+        except Exception:  # noqa: BLE001 - warming is best effort
+            pass
+    threading.Thread(target=run, daemon=True).start()
+
+
 @app.get("/api/config")
 def config():
     # v1 keys (web/index.html) merged with the v2 Config contract.
@@ -304,7 +317,9 @@ def _sse(event: str, data) -> str:
 
 @app.get("/api/waves")
 def waves(airport: str | None = None, q: str | None = None, limit: int = 50):
-    return WB.list_waves(airport=airport, q=q, limit=max(0, min(limit, 500)))
+    limit = max(0, min(limit, 500))
+    head = [] if (airport or q) else _replay_summaries()  # recorded flights.csv rows first: the challenge input
+    return (head + WB.list_waves(airport=airport, q=q, limit=limit))[:limit]
 
 
 @app.get("/api/flights")
@@ -320,6 +335,33 @@ def _wx_summary(m: dict) -> str:
     wind = f'{int(m["wind_dir_deg"]):03d}' if m.get("wind_dir_deg") is not None else "VRB"
     vis = f'{m["visibility_sm"]:g}SM' if m.get("visibility_sm") is not None else ""
     return f'{wind}{int(m.get("wind_kt") or 0):02d}KT {vis}, {m.get("surface") or "dry"}'.replace("  ", " ")
+
+
+def _f2015_summary(w: dict, replay_available: bool = False) -> dict:
+    flights = w["flights"]
+    return {"id": w["id"], "airport": {k: w["airport"][k] for k in ("iata", "icao", "name")},
+            "window_start": w["window_start"], "window_end": w["window_start"],
+            "n_flights": len(flights), "n_queue": len(w["queue"]),
+            "callsigns": [f["callsign"] for f in flights],
+            "disrupted_callsigns": [f["callsign"] for f in flights if f.get("disrupted")],
+            "weather_summary": _wx_summary(w.get("metar") or {}), "replay_available": replay_available}
+
+
+_REPLAY_SUMMARIES: list[dict] | None = None
+
+
+def _replay_summaries() -> list[dict]:
+    """flights.csv rows with a recorded run (the demo set), built once."""
+    global _REPLAY_SUMMARIES
+    if _REPLAY_SUMMARIES is None:
+        out = []
+        for p in sorted(REPLAY_DIR.glob("F2015-*.json")) if REPLAY_DIR.is_dir() else []:
+            try:
+                out.append(_f2015_summary(WB.build_wave(p.stem).to_dict(), replay_available=True))
+            except (KeyError, ValueError):
+                continue
+        _REPLAY_SUMMARIES = out
+    return _REPLAY_SUMMARIES
 
 
 @app.get("/api/waves/random")
@@ -340,13 +382,7 @@ def waves_random(airport: str | None = None, source: str = "flights2015"):
             w = WB.build_wave(rows[0]["wave_id"]).to_dict()
         except (KeyError, ValueError):
             continue
-        flights = w["flights"]
-        return {"id": w["id"], "airport": {k: w["airport"][k] for k in ("iata", "icao", "name")},
-                "window_start": w["window_start"], "window_end": w["window_start"],
-                "n_flights": len(flights), "n_queue": len(w["queue"]),
-                "callsigns": [f["callsign"] for f in flights],
-                "disrupted_callsigns": [f["callsign"] for f in flights if f.get("disrupted")],
-                "weather_summary": _wx_summary(w.get("metar") or {}), "replay_available": False}
+        return _f2015_summary(w)
     return _err(404, "not_found", "no flights.csv rows available for that airport")
 
 
@@ -400,13 +436,15 @@ async def negotiate_wave(request: Request, body: dict = Body(...)):
         return _err(422, "invalid_request", "model must be a string")
     run_id, started_at = uuid.uuid4().hex[:12], datetime.now(timezone.utc).isoformat()
 
+    rec = None
     if replay_flag:
         try:
             if not re.fullmatch(r"[A-Za-z0-9_.-]+", wave_id):
                 raise FileNotFoundError(wave_id)
             rec = replay.load(wave_id, REPLAY_DIR)
         except (FileNotFoundError, ValueError):
-            return _err(404, "replay_missing", f"no recorded run for wave {wave_id!r}")
+            rec = None  # no recording for this wave: negotiate it live instead of failing the demo
+    if rec is not None:
         chain = [_model_id(rec["result"].get("model") or "formula")]
         meta = {"run_id": run_id, "wave_id": wave_id, "mode": mode, "model_chain": chain, "started_at": started_at}
 

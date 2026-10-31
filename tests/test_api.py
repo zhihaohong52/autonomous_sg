@@ -94,9 +94,9 @@ def test_config_keys(client):
     assert j["replay_available"] is False
 
 
-def test_replay_missing_404(client):
-    r = client.post("/api/negotiate-wave", json={"wave_id": WID, "mode": "decision", "replay": True})
-    assert r.status_code == 404 and r.json()["error"]["code"]
+def test_replay_missing_runs_live(client):
+    r = client.post("/api/negotiate-wave", json={"wave_id": WID, "mode": "formulas", "replay": True, "stream": False})
+    assert r.status_code == 200 and r.json()["revision"]
 
 
 def test_replay_streams_saved_run(client, monkeypatch):
