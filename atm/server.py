@@ -314,12 +314,40 @@ def flights_2015(airport: str | None = None, q: str | None = None, limit: int = 
     return {"flights": rows, "total": total}
 
 
+def _wx_summary(m: dict) -> str:
+    if not m.get("raw"):
+        return "no METAR"
+    wind = f'{int(m["wind_dir_deg"]):03d}' if m.get("wind_dir_deg") is not None else "VRB"
+    vis = f'{m["visibility_sm"]:g}SM' if m.get("visibility_sm") is not None else ""
+    return f'{wind}{int(m.get("wind_kt") or 0):02d}KT {vis}, {m.get("surface") or "dry"}'.replace("  ", " ")
+
+
 @app.get("/api/waves/random")
-def waves_random(airport: str | None = None):
-    try:
-        return WB.random_wave(airport=airport)
-    except (KeyError, IndexError):
-        return _err(404, "not_found", "no waves available for that airport")
+def waves_random(airport: str | None = None, source: str = "flights2015"):
+    """Random challenge input: a random flights.csv row (default), or a BTS 2024 wave with source=bts."""
+    if source == "bts":
+        try:
+            return WB.random_wave(airport=airport)
+        except (KeyError, IndexError):
+            return _err(404, "not_found", "no waves available for that airport")
+    from .wave import flights2015
+    _, total = flights2015.search(airport=airport, limit=0)
+    for _ in range(10):  # skip rows at airports the builder cannot model
+        rows, _ = flights2015.search(airport=airport, limit=1, offset=random.randrange(total)) if total else ([], 0)
+        if not rows:
+            break
+        try:
+            w = WB.build_wave(rows[0]["wave_id"]).to_dict()
+        except (KeyError, ValueError):
+            continue
+        flights = w["flights"]
+        return {"id": w["id"], "airport": {k: w["airport"][k] for k in ("iata", "icao", "name")},
+                "window_start": w["window_start"], "window_end": w["window_start"],
+                "n_flights": len(flights), "n_queue": len(w["queue"]),
+                "callsigns": [f["callsign"] for f in flights],
+                "disrupted_callsigns": [f["callsign"] for f in flights if f.get("disrupted")],
+                "weather_summary": _wx_summary(w.get("metar") or {}), "replay_available": False}
+    return _err(404, "not_found", "no flights.csv rows available for that airport")
 
 
 @app.get("/api/wave/{wave_id}")
