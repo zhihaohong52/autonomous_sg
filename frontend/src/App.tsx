@@ -17,7 +17,7 @@ export function App() {
     <>
       <header className={`topbar${scrolled ? " scrolled" : ""}`}>
         <div className="bar-inner">
-          <a className="brand" href="#/wave"><img src="/mark.svg" alt="" /><span>Disruption Negotiator</span></a>
+          <a className="brand" href="#/wave"><img src="/mark.svg" alt="" /><span>Final Approach</span></a>
           <nav className="topnav" aria-label="Screens">
             <a href="#/wave" aria-current={!bench ? "page" : undefined}>Arrival wave</a>
             <a href="#/benchmark" aria-current={bench ? "page" : undefined}>Benchmark</a>
