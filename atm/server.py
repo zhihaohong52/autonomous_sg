@@ -22,6 +22,7 @@ from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import baseline, decide, jev, negotiation, scenario
+from .mcp_server import mcp_asgi_app
 from .wave import replay
 
 from .wave.loader import _load
@@ -439,6 +440,7 @@ async def negotiate_wave(request: Request, body: dict = Body(...)):
 
 
 app.mount("/static", StaticFiles(directory=WEB), name="static")
+app.mount("/mcp", mcp_asgi_app)  # before the "/" catch-all below, or that mount would shadow it
 
 
 FRONTEND_DIST = ROOT / "frontend" / "dist"
