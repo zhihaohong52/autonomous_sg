@@ -42,6 +42,18 @@ export interface WaveSummary {
   replay_available: boolean;
 }
 
+// v2.0: GET /api/flights -> { flights: FlightRow[]; total: number }  (rows of the challenge flights.csv)
+export interface FlightRow {
+  row_id: number;
+  wave_id: string;                     // "F2015-<row_id>", accepted by GET /api/wave/{id} and POST /api/negotiate-wave
+  date: string;
+  carrier: string; flight: string;
+  origin: string; dest: string;
+  sched_arr: string;                   // "HH:MM" local
+  arr_delay: number; weather_delay: number; late_aircraft_delay: number;
+}
+export interface FlightsResponse { flights: FlightRow[]; total: number }
+
 export interface WaveScenario {
   id: string;
   airport: Airport;
@@ -52,6 +64,7 @@ export interface WaveScenario {
   flights: WaveFlight[];               // negotiated flights
   gates: Gate[];
   severity?: Triage;                   // filled once a negotiation has triaged it
+  focus: string | null;                // v2.0: callsign of the disruption flight (its pilot is the PILOT agent)
   provenance: Provenance[];            // per layer for the whole wave
 }
 
@@ -141,13 +154,15 @@ export interface RuleCheck {
   evidence: Record<string, string | number>;   // e.g. { metar: "...", crosswind_kt: 24, limit_kt: 15 }
 }
 export type RuleId = "ATC-RWY-OPEN" | "ATC-WAKE-SEP" | "ATC-TAXI-ROUTE" | "ATC-WIND-LIMITS"
-  | "PLT-EARLIEST-ETA" | "PLT-FUEL-RESERVE" | "GND-GATE-SIZE" | "GND-GATE-FREE" | "GND-CREW-DUTY";
+  | "ATC-RWY-CAPACITY"                 // v2.0: landings per physical runway in the rolling 60 min <= workbook cap
+  | "PLT-EARLIEST-ETA" | "PLT-FUEL-RESERVE" | "GND-GATE-SIZE" | "GND-GATE-FREE" | "GND-CREW-DUTY"
+  | "GND-GATE-NOTICE";                 // v2.0: gate change only if arrival >= T+20 (remote stand exempt)
 
 export interface PlanEvaluation {
   plan_id: string;
   feasible: boolean;
   checks: RuleCheck[];                 // all rules, all flights
-  utilities: Record<AgentId, number>;  // 0..1 per agent (formula decision model)
+  utilities: Record<AgentId, number>;  // 0..1 for the 3 negotiating agents (formula decision model)
   totals: { delay_min: number; fuel_kg: number; hold_min: number; pax_protected_pct: number;
             overtime_min: number; diversions: number };
 }
@@ -155,7 +170,7 @@ export interface Move {
   id: string;
   agent: AgentId;
   kind: "swap_order" | "change_runway" | "shift_slot"                         // ATC
-      | "speed_reduction" | "ground_delay" | "request_divert" | "accept"      // PILOT (own flight)
+      | "speed_reduction" | "ground_delay" | "request_divert" | "accept"      // PILOT (own flight); ATC: speed/ground delay of non-focus flights
       | "reassign_gate" | "remote_stand" | "swap_gates";                     // GROUND
   callsigns: string[];
   params: Record<string, string | number>;   // { runway: "09R" } | { minutes: 6 } | { gate: "B4" }
@@ -178,7 +193,7 @@ export type NegotiationEvent =
 
 export interface NegotiationMessage {
   seq: number;                         // 0,1,2,… in order
-  round: number;                       // 0 = triage/opening, 1..3
+  round: number;                       // the turn: 0 = triage/opening, 1..3
   ts: string;
   sender: Sender;
   type: MessageType;
@@ -186,8 +201,9 @@ export interface NegotiationMessage {
   rationale: string;                   // one line, shown under the message
   decision?: DecisionMeta;             // present when a model/formula made a decision
 }
-export type MessageType = "TRIAGE" | "OPEN" | "MOVE" | "MOVE_REJECTED" | "COUNTER" | "CHECK"
-  | "VOTE" | "CONSENSUS" | "NO_CONSENSUS" | "FALLBACK" | "MODEL_FALLBACK";
+export type MessageType = "TRIAGE" | "OPEN" | "AGENT_TURN" | "CHECK" | "CONSENSUS" | "NO_CONSENSUS"
+  | "FALLBACK" | "MODEL_FALLBACK"
+  | "MOVE" | "MOVE_REJECTED" | "COUNTER" | "VOTE";   // superseded in v2.0 (never emitted), kept for old runs
 
 export interface DecisionMeta {
   kind: "choice" | "noul" | "score" | "formula";
@@ -201,29 +217,56 @@ export interface DecisionMeta {
 
 export type MessageBody =
   | { type: "TRIAGE"; score: number; levels: string[]; probabilities: number[]; confidence?: number }
-  | { type: "OPEN"; plan: JointPlan; evaluation: PlanEvaluation }          // ATC's FCFS opening plan
-  | { type: "MOVE"; move: Move; plan: JointPlan; options_count: number }   // accepted move, plan after it
-  | { type: "MOVE_REJECTED"; move: Move; violations: RuleCheck[] }         // engine vetoed, agent re-picks
-  | { type: "COUNTER"; plan: JointPlan; evaluation: PlanEvaluation }       // agent's finished counter-plan
-  | { type: "CHECK"; plan_id: string; passed: boolean; violations: RuleCheck[] }
-  | { type: "VOTE"; votes: Vote[] }
-  | { type: "CONSENSUS"; plan_id: string; accepted_by: AgentId[] }
-  | { type: "NO_CONSENSUS"; valid_plan_ids: string[]; next_reservation: Record<AgentId, number> }
-  | { type: "FALLBACK"; plan_id: string; method: string; reason: string }
-  | { type: "MODEL_FALLBACK"; agent: AgentId; from_model: string; to_model: string; error: string };
+  | { type: "OPEN"; plan: JointPlan; evaluation: PlanEvaluation;          // ENGINE: FCFS opening plan (incumbent of turn 1)
+      agents: AgentId[]; focus: string }
+  | AgentTurnBody                                                          // v2.0: the ONE message per agent per turn
+  | { type: "CHECK"; plan_id: string; passed: boolean; violations: RuleCheck[]; proposed_by?: AgentId }
+  | { type: "CONSENSUS"; plan_id: string; accepted_by: AgentId[]; turn: number }
+  | { type: "NO_CONSENSUS"; valid_plan_ids: string[]; next_reservation: Record<AgentId, number>;
+      turn: number; reason: string }
+  | { type: "FALLBACK"; plan_id: string; method: string; reason: string }  // reason: why no consensus (who rejected what)
+  | { type: "MODEL_FALLBACK"; agent: AgentId; from_model: string; to_model: string; error: string }
+  // superseded in v2.0, never emitted by new runs:
+  | { type: "MOVE"; move: Move; plan: JointPlan; options_count: number }
+  | { type: "MOVE_REJECTED"; move: Move; violations: RuleCheck[] }
+  | { type: "COUNTER"; plan: JointPlan; evaluation: PlanEvaluation }
+  | { type: "VOTE"; votes: LegacyVote[] };
 
+// v2.0: one structured message per agent per turn (sender = agent, round = turn)
+export interface AgentTurnBody {
+  type: "AGENT_TURN";
+  turn: number;                        // 1..3
+  agent: AgentId;
+  role: "ATC" | "PILOT" | "GROUND";
+  moves: AppliedMove[];                // moves applied this turn, in order (0-3), each engine-checked
+  rejected: RejectedMove[];            // moves the engine vetoed this turn (agent re-picked)
+  proposal: JointPlan;                 // the agent's plan for the table after its moves (metrics filled)
+  proposal_utility: number;            // the agent's own utility for its proposal
+  votes: Vote[];                       // on every CHECK-passed plan on the table when it speaks
+  rationale: string;
+  decision?: DecisionMeta;             // the vote decision (moves carry their own)
+}
+export interface AppliedMove { move: Move; utility_before: number; utility_after: number; decision: DecisionMeta }
+export interface RejectedMove { move: Move; violations: RuleCheck[]; reason: string; decision: DecisionMeta }
 export interface Vote {
   plan_id: string;
-  decision: "ACCEPT" | "REJECT";
+  vote: "ACCEPT" | "REJECT";
   p_accept?: number;                   // absent in formulas mode
   utility: number; reservation: number;
   reason: string;
 }
+export interface LegacyVote { plan_id: string; decision: "ACCEPT" | "REJECT"; p_accept?: number;
+                              utility: number; reservation: number; reason: string }
 
 export interface NegotiationResult {
   run_id: string; wave_id: string; mode: Mode; model: string;
   outcome: "consensus" | "fallback";
-  rounds: number;
+  rounds: number;                      // = turns (kept for v1.x clients)
+  turns: number;                       // v2.0: 1..3
+  agents: AgentId[];                   // v2.0: ["ATC", "PILOT:<focus>", "GROUND"]
+  focus: string;                       // v2.0: callsign of the disruption flight
+  revision: Revision;                  // v2.0: the challenge output for the focus flight
+  limits: Limit[];                     // v2.0: every limit used, kept or changed, with its source
   final_plan: JointPlan;
   evaluation: PlanEvaluation;          // all checks pass by construction
   baseline: { plan: JointPlan; evaluation: PlanEvaluation };  // status quo FCFS
@@ -231,6 +274,27 @@ export interface NegotiationResult {
   model_errors: string[];
   stats: { model_calls: number; fallbacks: number; elapsed_ms: number };
   log?: NegotiationMessage[];          // included when stream=false and in GET /api/runs/{id}
+}
+
+export interface Revision {
+  callsign: string;
+  action: "land" | "hold" | "ground_delay" | "divert";   // hold = airborne holding > 0
+  revised_arrival: string | null;      // "HH:MM" local (window_start + slot); null when diverting
+  revised_arrival_min: number | null;  // landing slot vs T0
+  revised_arrival_t?: string;          // "T+12"
+  runway: string | null; gate: string | null;
+  scheduled_arrival: string;           // "HH:MM" local
+  scheduled_gate: string;
+  speed_reduction_min?: number; ground_delay_min?: number; hold_min?: number;
+  alternate?: string | null;           // divert only
+  delay_vs_schedule_min: number;       // landing slot - scheduled arrival (divert: estimated delay)
+  summary: string;                     // one line for the UI
+}
+export interface Limit {
+  limit: string;
+  value: string;
+  source: "workbook" | "real data" | "assumption";
+  note: string;
 }
 
 export interface DecisionRequest { run_id: string; decision: "APPROVE" | "OVERRIDE"; note?: string } // note required for OVERRIDE

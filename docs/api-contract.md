@@ -1,6 +1,10 @@
 # API contract: Disruption Negotiator v2 (wave mode)
 
-Status: **v1.2, 31 Oct 2026 12:55** (added `Triage`; `/api/eval` marked v1; benchmark brier/latency/ablation nullable). Frozen at 12:30 for the frontend; any later change is
+Status: **v2.0, 31 Oct 2026 13:40** (challenge rules_of_play: exactly 3 agents ATC / PILOT:<focus> / GROUND,
+one `AGENT_TURN` message per agent per turn, max 3 turns; `MOVE`/`MOVE_REJECTED`/`COUNTER`/`VOTE` superseded;
+result gains `revision`, `limits`, `turns`, `agents`, `focus`; `Wave.focus`; `GET /api/flights`; new rules
+`ATC-RWY-CAPACITY`, `GND-GATE-NOTICE`; workbook limits). v1.2 (12:55): added `Triage`; `/api/eval` marked v1;
+benchmark brier/latency/ablation nullable. Frozen at 12:30 for the frontend; any later change is
 announced in the commit message with the prefix `contract:`. Design: `docs/superpowers/specs/2026-10-31-disruption-negotiator-design.md`.
 
 The frontend (Vite + React + TS, `frontend/`) talks only to these endpoints. In dev, Vite proxies
@@ -12,8 +16,12 @@ response per endpoint in `frontend/src/api/samples/*.json`. Until then, build ag
 
 - JSON, `snake_case` keys. Times on the wave timeline are **minutes relative to the wave window
   start `T0`** (`*_min`, may be negative); every entity also carries ISO strings for display.
-- `AgentId`: `"ATC" | "GROUND" | "PILOT:<callsign>"` (one Pilot agent per wave flight), plus the
-  non-agent senders `"ENGINE"` (safety rules / protocol) and `"DECIDER"` (wave triage).
+- `AgentId`: `"ATC" | "GROUND" | "PILOT:<callsign>"`. Since v2.0 exactly **three** agents negotiate:
+  `ATC`, `PILOT:<WaveScenario.focus>` (the pilot of the disruption flight only) and `GROUND`
+  (`NegotiationResult.agents`). Other wave flights have no pilot agent: ATC sequences them (runway,
+  slot/holding, speed control or ground delay as ATC instructions), GROUND assigns their gates, and the
+  engine still checks all their rules. Non-agent senders: `"ENGINE"` (safety rules / protocol) and
+  `"DECIDER"` (wave triage).
 - Errors: non-2xx status with `{ "error": { "code": string, "message": string } }`.
   `429` adds `retry_after_s`. Rate limit: 10 live negotiations per 10 min per IP.
 - Every real-world fact carries a `Provenance` so the UI can badge real vs simulated.
@@ -37,7 +45,8 @@ interface Provenance {
 | GET | `/api/config` | `Config` |
 | GET | `/api/waves?airport=ATL&q=DL123&limit=50` | `WaveSummary[]` |
 | GET | `/api/waves/random?airport=ATL` | `WaveSummary` |
-| GET | `/api/wave/{wave_id}` | `WaveScenario` |
+| GET | `/api/flights?airport=ATL&q=DL123&limit=50&offset=0` | `{ flights: FlightRow[]; total: number }` (rows of the 2015 challenge flights.csv) |
+| GET | `/api/wave/{wave_id}` | `WaveScenario` (`wave_id` may be a BTS wave id or `"F2015-<row_id>"`) |
 | POST | `/api/negotiate-wave` | SSE stream of `NegotiationEvent` (or `NegotiationResult` with `stream:false`) |
 | GET | `/api/runs/{run_id}` | `NegotiationResult` (with full `log`) |
 | POST | `/api/decision` | `{ ok: true, recorded_at: string }` |
@@ -87,6 +96,25 @@ interface WaveSummary {
 }
 ```
 
+### GET /api/flights
+
+Rows of the challenge `flights.csv` (2015, cancelled rows skipped), filtered by destination airport
+and free text (callsign, tail, origin, dest, wave id). Picking a row = the challenge input: its
+`wave_id` `"F2015-<row_id>"` works everywhere a wave id is accepted (`GET /api/wave/{id}`,
+`POST /api/negotiate-wave`); that row's flight becomes `WaveScenario.focus`.
+
+```ts
+interface FlightRow {
+  row_id: number;
+  wave_id: string;                     // "F2015-<row_id>"
+  date: string;                        // "2015-01-01"
+  carrier: string; flight: string;     // "AA", "AA1234"
+  origin: string; dest: string;
+  sched_arr: string;                   // "HH:MM" local
+  arr_delay: number; weather_delay: number; late_aircraft_delay: number;   // minutes
+}
+```
+
 ### GET /api/wave/{wave_id}
 
 ```ts
@@ -100,6 +128,8 @@ interface WaveScenario {
   flights: WaveFlight[];               // negotiated flights
   gates: Gate[];
   severity?: Triage;                   // filled once a negotiation has triaged it
+  focus: string | null;                // v2.0: callsign of the disruption flight (its pilot is the PILOT agent);
+                                       // null => the engine uses the most-delayed disrupted flight
   provenance: Provenance[];            // per layer for the whole wave
 }
 
@@ -191,17 +221,21 @@ interface RuleCheck {
   callsign?: string;                   // flight the check is about
   passed: boolean;
   detail: string;                      // human-readable, cites values
-  source: string;                      // "FAA Order 8400.9 §6d", "ICAO wake separation (time-based)", "ops rule"
+  source: string;                      // "FAA Order 8400.9 §6d", "challenge2_operational_constraints.xlsx wake_separation ...", "ops rule"
   evidence: Record<string, string | number>;   // e.g. { metar: "...", crosswind_kt: 24, limit_kt: 15 }
 }
 type RuleId = "ATC-RWY-OPEN" | "ATC-WAKE-SEP" | "ATC-TAXI-ROUTE" | "ATC-WIND-LIMITS"
-  | "PLT-EARLIEST-ETA" | "PLT-FUEL-RESERVE" | "GND-GATE-SIZE" | "GND-GATE-FREE" | "GND-CREW-DUTY";
+  | "ATC-RWY-CAPACITY"                 // v2.0: landings per physical runway in the rolling 60 min <= workbook cap
+  | "PLT-EARLIEST-ETA" | "PLT-FUEL-RESERVE" | "GND-GATE-SIZE" | "GND-GATE-FREE" | "GND-CREW-DUTY"
+  | "GND-GATE-NOTICE";                 // v2.0: gate change only if arrival >= T+20 (remote stand exempt)
+// v2.0: GND-CREW-DUTY never fails any more (workbook: overtime after the 8 h shift is allowed at 1.5x cost);
+// it reports overtime. PLT-CREW-DUTY (13 h) is not enforced: no crew report time in the data (see `limits`).
 
 interface PlanEvaluation {
   plan_id: string;
   feasible: boolean;
   checks: RuleCheck[];                 // all rules, all flights
-  utilities: Record<AgentId, number>;  // 0..1 per agent (formula decision model)
+  utilities: Record<AgentId, number>;  // 0..1 for the 3 negotiating agents (formula decision model)
   totals: { delay_min: number; fuel_kg: number; hold_min: number; pax_protected_pct: number;
             overtime_min: number; diversions: number };
 }
@@ -209,7 +243,9 @@ interface Move {
   id: string;
   agent: AgentId;
   kind: "swap_order" | "change_runway" | "shift_slot"                         // ATC
-      | "speed_reduction" | "ground_delay" | "request_divert" | "accept"      // PILOT (own flight)
+      | "speed_reduction" | "ground_delay" | "request_divert" | "accept"      // PILOT (own flight);
+                                                                             // v2.0: ATC may also issue speed_reduction /
+                                                                             // ground_delay for non-focus flights
       | "reassign_gate" | "remote_stand" | "swap_gates";                     // GROUND
   callsigns: string[];
   params: Record<string, string | number>;   // { runway: "09R" } | { minutes: 6 } | { gate: "B4" }
@@ -248,7 +284,7 @@ type NegotiationEvent =
 
 interface NegotiationMessage {
   seq: number;                         // 0,1,2,… in order
-  round: number;                       // 0 = triage/opening, 1..3
+  round: number;                       // the turn: 0 = triage/opening, 1..3
   ts: string;
   sender: Sender;
   type: MessageType;
@@ -256,8 +292,9 @@ interface NegotiationMessage {
   rationale: string;                   // one line, shown under the message
   decision?: DecisionMeta;             // present when a model/formula made a decision
 }
-type MessageType = "TRIAGE" | "OPEN" | "MOVE" | "MOVE_REJECTED" | "COUNTER" | "CHECK"
-  | "VOTE" | "CONSENSUS" | "NO_CONSENSUS" | "FALLBACK" | "MODEL_FALLBACK";
+type MessageType = "TRIAGE" | "OPEN" | "AGENT_TURN" | "CHECK" | "CONSENSUS" | "NO_CONSENSUS"
+  | "FALLBACK" | "MODEL_FALLBACK"
+  | "MOVE" | "MOVE_REJECTED" | "COUNTER" | "VOTE";   // superseded in v2.0 (never emitted), kept for old runs
 
 interface DecisionMeta {
   kind: "choice" | "noul" | "score" | "formula";
@@ -271,29 +308,56 @@ interface DecisionMeta {
 
 type MessageBody =
   | { type: "TRIAGE"; score: number; levels: string[]; probabilities: number[]; confidence?: number }
-  | { type: "OPEN"; plan: JointPlan; evaluation: PlanEvaluation }          // ATC's FCFS opening plan
-  | { type: "MOVE"; move: Move; plan: JointPlan; options_count: number }   // accepted move, plan after it
-  | { type: "MOVE_REJECTED"; move: Move; violations: RuleCheck[] }         // engine vetoed, agent re-picks
-  | { type: "COUNTER"; plan: JointPlan; evaluation: PlanEvaluation }       // agent's finished counter-plan
-  | { type: "CHECK"; plan_id: string; passed: boolean; violations: RuleCheck[] }
-  | { type: "VOTE"; votes: Vote[] }
-  | { type: "CONSENSUS"; plan_id: string; accepted_by: AgentId[] }
-  | { type: "NO_CONSENSUS"; valid_plan_ids: string[]; next_reservation: Record<AgentId, number> }
-  | { type: "FALLBACK"; plan_id: string; method: string; reason: string }
-  | { type: "MODEL_FALLBACK"; agent: AgentId; from_model: string; to_model: string; error: string };
+  | { type: "OPEN"; plan: JointPlan; evaluation: PlanEvaluation;          // ENGINE: FCFS opening plan (incumbent of turn 1)
+      agents: AgentId[]; focus: string }
+  | AgentTurnBody                                                          // v2.0: the ONE message per agent per turn
+  | { type: "CHECK"; plan_id: string; passed: boolean; violations: RuleCheck[]; proposed_by?: AgentId }
+  | { type: "CONSENSUS"; plan_id: string; accepted_by: AgentId[]; turn: number }
+  | { type: "NO_CONSENSUS"; valid_plan_ids: string[]; next_reservation: Record<AgentId, number>;
+      turn: number; reason: string }
+  | { type: "FALLBACK"; plan_id: string; method: string; reason: string }  // reason: why no consensus (who rejected what)
+  | { type: "MODEL_FALLBACK"; agent: AgentId; from_model: string; to_model: string; error: string }
+  // superseded in v2.0, never emitted by new runs:
+  | { type: "MOVE"; move: Move; plan: JointPlan; options_count: number }
+  | { type: "MOVE_REJECTED"; move: Move; violations: RuleCheck[] }
+  | { type: "COUNTER"; plan: JointPlan; evaluation: PlanEvaluation }
+  | { type: "VOTE"; votes: LegacyVote[] };
 
+// v2.0: one structured message per agent per turn (sender = agent, round = turn)
+interface AgentTurnBody {
+  type: "AGENT_TURN";
+  turn: number;                        // 1..3
+  agent: AgentId;
+  role: "ATC" | "PILOT" | "GROUND";
+  moves: AppliedMove[];                // moves applied this turn, in order (0-3), each engine-checked
+  rejected: RejectedMove[];            // moves the engine vetoed this turn (agent re-picked)
+  proposal: JointPlan;                 // the agent's plan for the table after its moves (metrics filled)
+  proposal_utility: number;            // the agent's own utility for its proposal
+  votes: Vote[];                       // on every CHECK-passed plan on the table when it speaks
+  rationale: string;
+  decision?: DecisionMeta;             // the vote decision (moves carry their own)
+}
+interface AppliedMove { move: Move; utility_before: number; utility_after: number; decision: DecisionMeta }
+interface RejectedMove { move: Move; violations: RuleCheck[]; reason: string; decision: DecisionMeta }
 interface Vote {
   plan_id: string;
-  decision: "ACCEPT" | "REJECT";
+  vote: "ACCEPT" | "REJECT";
   p_accept?: number;                   // absent in formulas mode
   utility: number; reservation: number;
   reason: string;
 }
+interface LegacyVote { plan_id: string; decision: "ACCEPT" | "REJECT"; p_accept?: number;
+                       utility: number; reservation: number; reason: string }
 
 interface NegotiationResult {
   run_id: string; wave_id: string; mode: Mode; model: string;
   outcome: "consensus" | "fallback";
-  rounds: number;
+  rounds: number;                      // = turns (kept for v1.x clients)
+  turns: number;                       // v2.0: 1..3
+  agents: AgentId[];                   // v2.0: ["ATC", "PILOT:<focus>", "GROUND"]
+  focus: string;                       // v2.0: callsign of the disruption flight
+  revision: Revision;                  // v2.0: the challenge output for the focus flight
+  limits: Limit[];                     // v2.0: every limit used, kept or changed, with its source
   final_plan: JointPlan;
   evaluation: PlanEvaluation;          // all checks pass by construction
   baseline: { plan: JointPlan; evaluation: PlanEvaluation };  // status quo FCFS
@@ -302,11 +366,41 @@ interface NegotiationResult {
   stats: { model_calls: number; fallbacks: number; elapsed_ms: number };
   log?: NegotiationMessage[];          // included when stream=false and in GET /api/runs/{id}
 }
+
+interface Revision {
+  callsign: string;
+  action: "land" | "hold" | "ground_delay" | "divert";   // hold = airborne holding > 0
+  revised_arrival: string | null;      // "HH:MM" local (window_start + slot); null when diverting
+  revised_arrival_min: number | null;  // landing slot vs T0
+  revised_arrival_t?: string;          // "T+12"
+  runway: string | null; gate: string | null;
+  scheduled_arrival: string;           // "HH:MM" local
+  scheduled_gate: string;
+  speed_reduction_min?: number; ground_delay_min?: number; hold_min?: number;
+  alternate?: string | null;           // divert only
+  delay_vs_schedule_min: number;       // landing slot - scheduled arrival (divert: estimated delay)
+  summary: string;                     // one line for the UI
+}
+interface Limit {
+  limit: string;                       // "wake separation (same runway)"
+  value: string;                       // "Heavy->any 120 s, ..."
+  source: "workbook" | "real data" | "assumption";
+  note: string;                        // what we changed / why
+}
 ```
 
-Message order within a round: `MOVE`/`MOVE_REJECTED` (per agent, ATC → each PILOT → GROUND) →
-`COUNTER` per agent → `CHECK` per counter-plan → `VOTE` per agent → `CONSENSUS` or `NO_CONSENSUS`.
-Round 0 carries `TRIAGE` and `OPEN`. `FALLBACK` only after round 3. `MODEL_FALLBACK` can appear anywhere.
+Message order (v2.0). Round 0: `TRIAGE`, `OPEN`. Each turn 1..3:
+`AGENT_TURN(ATC)` → `CHECK` (if its proposal is new) → `AGENT_TURN(PILOT:<focus>)` → `CHECK` →
+`AGENT_TURN(GROUND)` → `CHECK` → `CONSENSUS` or `NO_CONSENSUS`. Exactly one `AGENT_TURN` per agent
+per turn. `FALLBACK` only after `NO_CONSENSUS` of turn 3. `MODEL_FALLBACK` can appear anywhere.
+
+Protocol rules: in turn t ATC starts from the incumbent plan, PILOT from ATC's proposal, GROUND from
+PILOT's. Each agent votes on every CHECK-passed plan on the table when it speaks (incumbent, proposals
+earlier in this turn, its own proposal). Consensus = one CHECK-passed plan ACCEPTed by all 3 agents in
+the same turn. Otherwise the best CHECK-passed plan of the turn becomes the next incumbent; after turn
+3 the deterministic non-AI solver decides and `FALLBACK.reason` says why. Limits come from the
+challenge workbook (`data/challenge2/challenge2_operational_constraints.xlsx`); every limit kept,
+changed or added is listed in `NegotiationResult.limits`.
 
 ### POST /api/decision
 
@@ -343,8 +437,10 @@ interface BenchmarkReport {
 
 - **Hero:** runway + gate timeline. Lanes = runways (from `Airport.runways` that are open) and gates
   (`Gate[]`); bars = `queue` (grey, fixed) and wave flights (`Assignment.slot_min`, `in_block_min`);
-  animate between consecutive `MOVE` plans; flash red on `MOVE_REJECTED` with `violations[0].detail`.
-- Wave picker, mode + model selector, triage card, agent timeline by round (colour per agent;
+  animate between consecutive `AGENT_TURN.proposal` plans; flash red on each `AGENT_TURN.rejected[]`
+  item with `violations[0].detail`.
+- Flight picker (`/api/flights`) and wave picker, mode + model selector, triage card, revision card
+  (`revision.summary`), consensus log by turn (one card per `AGENT_TURN`; colour per agent;
   `decision` shows model, probability, latency, and `fallback_from` as a warning), per-flight
   provenance badges, wind table (`runway_wind`), decision panel (final plan per flight, utilities,
   full `checks` with `source` + `evidence`, before/after vs `baseline`, regressions in red), Approve /
