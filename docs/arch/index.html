@@ -58,7 +58,7 @@ svg { position:absolute; inset:0; }
 <div class="grp" style="left:60px;top:775px;width:1440px;height:270px;border-color:var(--violet)"><div class="k" style="color:var(--violet)">What jev-1.14 is asked (TypeSafe System One) · code does the maths, the model judges</div></div>
 <div class="q" style="left:85px"><div class="k" style="color:var(--violet)">1 · Triage · Score</div><b>“How severe is this wave?”</b><p><i>Given:</i> closures, wind, queue, delays</p><p><i>Out:</i> level 0–3 + probability → sets moves per turn</p></div>
 <div class="q" style="left:560px"><div class="k" style="color:var(--violet)">2 · Move · Choice</div><b>“Pick ONE move for your authority, or no move”</b><p><i>Given per option:</i> fixes / adds rule breaches · better / worse for you · engine rank</p><p><i>Out:</i> option key + probabilities → engine CHECK, veto if it adds a breach</p></div>
-<div class="q" style="left:1035px"><div class="k" style="color:var(--violet)">3 · Vote · Noul (yes/no)</div><b>“Do you accept plan P?”</b><p><i>Given:</i> passes every rule · meets your minimum (yes, clearly / just; no) · best for you?</p><p><i>Out:</i> P(accept) ≥ 0.5 → ACCEPT; code tallies 3 of 3</p></div>
+<div class="q" style="left:1035px"><div class="k" style="color:var(--violet)">3 · Vote · Noul (yes/no)</div><b>“Do you accept plan P?”</b><p><i>Given:</i> passes every rule · meets your minimum (yes, clearly / just; no) · best for you?</p><p><i>Out:</i> P(accept) ≥ 0.7 ACCEPT · ≤ 0.3 REJECT · in between the formula decides; code tallies 3 of 3</p></div>
 </div></div>
 <script>const tl = gsap.timeline({ paused: true }); window.__timelines["main"] = tl; tl.seek(0);</script>
 </body></html>
