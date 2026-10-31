@@ -209,8 +209,8 @@ class Decider:
         run = self._run(state, lambda: {"q": ts.Noul(instructions=instructions)}, parse, formula)
         return self._result(run, lambda p: p)
 
-    def noul_batch(self, state: dict, items: dict[str, str],
-                   formula: Callable[[str], float]) -> dict[str, DecisionResult]:
+    def noul_batch(self, state: dict, items: dict[str, object],
+                   formula: Callable[[str], float], criteria: dict | None = None) -> dict[str, DecisionResult]:
         import typesafe_sdk as ts
         ids = list(items)
         if not ids:
@@ -219,7 +219,7 @@ class Decider:
         def parse(resp):
             return {iid: _p_yes(_answer(resp, f"q{i}")) for i, iid in enumerate(ids)}
 
-        run = self._run(state, lambda: {f"q{i}": ts.Noul(instructions=items[iid]) for i, iid in enumerate(ids)},
+        run = self._run(state, lambda: {f"q{i}": ts.Noul(instructions=items[iid], criteria=criteria) for i, iid in enumerate(ids)},
                         parse, lambda: {iid: formula(iid) for iid in ids})
         parsed, entry, ms, fb, errs, model, att = run
         if entry is None:

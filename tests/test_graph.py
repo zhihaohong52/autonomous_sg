@@ -194,7 +194,7 @@ def test_engine_rejects_unsafe_model_pick(monkeypatch):
     def fake(self, entry, state, questions):
         q = questions.get("q")
         if getattr(q, "type", None) == "choice":
-            pick = next((k for k, v in q.criteria.items() if v.startswith(bad)), None)
+            pick = next((k for k, v in q.criteria.items() if (v["move"] if isinstance(v, dict) else v).startswith(bad)), None)
             if pick:
                 return NS(answers={"q": NS(choice=pick, probabilities={pick: 0.9}, confidence=0.8)})
         raise RuntimeError("defer to formula")

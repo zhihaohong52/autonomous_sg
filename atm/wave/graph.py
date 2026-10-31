@@ -371,13 +371,17 @@ def _agent_moves(run: _Run, agent: str, rnd: int, table: JointPlan, known: set[s
             if not avail:
                 stop = True
                 break
-            options = {k: f"{v[0].label} | your utility after {v[3]:.3f} (now {u_now:.3f})"
-                          f" | known rule violations after {v[4]} (now {k_now})"
-                          + (f": {', '.join(_known_rules(agent, v[2], known))}" if v[4] else "")
+            # System One models judge, code does the maths: every comparison is pre-computed into words
+            ranked = sorted(avail, key=lambda k: (avail[k][4], -avail[k][3], k))
+            options = {k: {"move": v[0].label,
+                           "rule_breaches": _breach_words(v[4], k_now, _known_rules(agent, v[2], known)),
+                           "for_you": _gain_words(v[3] - u_now),
+                           "engine_rank": f"{ranked.index(k) + 1} of {len(ranked)} (fewest rule breaches, then best for you)"}
                        for k, v in avail.items()}
             has_accept = any(v[0].kind == "accept" for v in avail.values())
             if not has_accept:
-                options[PASS] = f"Make no further move | your utility stays {u_now:.3f}"
+                options[PASS] = {"move": "Make no further move this turn", "rule_breaches": _breach_words(k_now, k_now, []),
+                                 "for_you": "no change for you", "engine_rank": "keep the plan as it is"}
 
             def formula(avail=avail, has_accept=has_accept) -> str:
                 cand = {k: v for k, v in avail.items()
@@ -390,16 +394,16 @@ def _agent_moves(run: _Run, agent: str, rnd: int, table: JointPlan, known: set[s
                     return next(k for k, v in avail.items() if v[0].kind == "accept")
                 return PASS
 
-            state = {"role": _role(agent), "agent": agent, "turn": rnd, "objective": OBJECTIVES[_role(agent)],
+            state = {"role": _role(agent), "agent": agent, "turn": rnd, "turns_left": MAX_TURNS - rnd,
+                     "objective": OBJECTIVES[_role(agent)],
                      "view": _view(w, plan, agent),
-                     "utility_terms": {k: round(v, 3) for k, v in agent_terms(w, plan, agent).items()},
-                     "utility_now": u_now, "reservation": run.reservation(agent, rnd),
                      "rules_published_by_engine": sorted(known),
-                     "known_violations_now": k_now,
-                     "guidance": "Prefer options that reduce known rule violations; among equals, "
-                                 "higher own utility. Pass/accept if nothing improves."}
-            r = dec.choice(state, f"You are {agent}. Pick ONE move for your own authority that best serves your "
-                                  "objective, or pass/accept. A safety engine will veto illegal moves.",
+                     "rule_breaches_on_the_table": _breach_words(k_now, k_now, []),
+                     "guidance": "Fixing rule breaches comes first; then pick what is better for you. "
+                                 "Make no further move if nothing is better."}
+            r = dec.choice(state, f"You are {agent}. Pick ONE move for your own authority, or make no further move. "
+                                  "Each option's `rule_breaches` and `for_you` were computed by the safety engine; "
+                                  "trust them, do not recompute.",
                            options, formula)
             run.account(r)
             pick = r.value
@@ -438,6 +442,33 @@ def _choice_meta(r: DecisionResult, info: dict) -> dict:
     return m
 
 
+def _gain_words(d: float) -> str:
+    if d > 0.02:
+        return "clearly better for you"
+    if d > 1e-9:
+        return "slightly better for you"
+    if d > -1e-9:
+        return "no change for you"
+    return "slightly worse for you" if d > -0.02 else "clearly worse for you"
+
+
+def _meets_words(margin: float) -> str:
+    if margin >= 0.05:
+        return "yes, clearly"
+    if margin >= 0:
+        return "yes, just"
+    return "no, just short" if margin > -0.05 else "no, well short"
+
+
+def _breach_words(after: int, now: int, rules_after: list[str]) -> str:
+    tail = f" ({', '.join(rules_after)})" if after and rules_after else ""
+    if after < now:
+        return f"fixes {now - after} rule breach{'es' if now - after > 1 else ''}; {after} left{tail}"
+    if after > now:
+        return f"adds {after - now} rule breach{'es' if after - now > 1 else ''}; {after} in total{tail}"
+    return f"no rule breaches" if after == 0 else f"rule breaches unchanged at {after}{tail}"
+
+
 def _votes(run: _Run, agent: str, rnd: int, plans: list[JointPlan]) -> tuple[list[dict], list[dict], dict | None]:
     """(MODEL_FALLBACK messages, votes, DecisionMeta) for `agent` on the CHECK-passed `plans`."""
     w = run.wave
@@ -446,13 +477,24 @@ def _votes(run: _Run, agent: str, rnd: int, plans: list[JointPlan]) -> tuple[lis
     if not plans:
         return buf, [], None
     us = {p.id: agent_utility(w, p, agent) for p in plans}
-    items = {p.id: f"As {agent}, accept plan {p.id} ({p.describe()[:160]})? Your utility {us[p.id]:.3f}, "
-                   f"your reservation {res:.3f}." for p in plans}
-    state = {"role": _role(agent), "agent": agent, "turn": rnd, "objective": OBJECTIVES[_role(agent)],
-             "reservation": res, "max_turns": MAX_TURNS,
-             "plans": {p.id: {"utility": us[p.id], "terms": {k: round(v, 3) for k, v in
-                                                             agent_terms(w, p, agent).items()}} for p in plans}}
-    rs = run.decider(agent, rnd, buf).noul_batch(state, items, lambda pid: 1.0 if us[pid] >= res else 0.0)
+    # code compares utility with the reservation; the model only judges whether to accept, given the verdict
+    items = {p.id: {"question": f"As {agent}, do you accept plan {p.id}?",
+                    "plan": p.describe()[:160],
+                    "passes_every_safety_rule": "yes (engine CHECK passed)",
+                    "meets_your_minimum_this_turn": _meets_words(us[p.id] - res),
+                    "for_you_vs_best_plan_on_the_table": "this is the best plan for you"
+                    if us[p.id] >= max(us.values()) - 1e-9 else _gain_words(us[p.id] - max(us.values()))}
+             for p in plans}
+    state = {"role": _role(agent), "agent": agent, "turn": rnd, "turns_left": MAX_TURNS - rnd,
+             "objective": OBJECTIVES[_role(agent)],
+             "note": "If no plan is accepted by all three agents within 3 turns, a deterministic solver decides "
+                     "for everyone; your minimum drops each turn."}
+    criteria = {"true": "Accept: the plan meets your minimum this turn (`meets_your_minimum_this_turn` starts "
+                        "with yes). Safety is already guaranteed by the engine.",
+                "false": "Reject: `meets_your_minimum_this_turn` starts with no. Not a reason to reject: the "
+                         "plan is only slightly worse for you than another plan but still meets your minimum."}
+    rs = run.decider(agent, rnd, buf).noul_batch(state, items, lambda pid: 1.0 if us[pid] >= res else 0.0,
+                                                 criteria=criteria)
     first = next(iter(rs.values()))
     run.account(first)
     votes = []

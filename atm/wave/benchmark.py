@@ -185,6 +185,14 @@ def mean(xs: list[float]) -> float:
     return round(statistics.fmean(xs), 3) if xs else 0.0
 
 
+def ci95(xs: list[float]) -> list[float] | None:
+    """mean +/- 1.96*sd/sqrt(n); null when n < 2."""
+    if len(xs) < 2:
+        return None
+    m, h = statistics.fmean(xs), 1.96 * statistics.stdev(xs) / len(xs) ** 0.5
+    return [round(m - h, 3), round(m + h, 3)]
+
+
 def pct(num: float, den: float) -> float:
     return round(100.0 * num / den, 2) if den else 0.0
 
@@ -258,6 +266,57 @@ def summarize(runs: dict[str, dict], formula_runs: dict[str, dict], waves: list,
     })
     return s, {"n_ok": len(ok), "failed_ids": failed, "p95_all_ms": percentile(all_lat, 0.95) if all_lat else None,
                "model_decisions": len(model_lat)}
+
+
+def run_optimiser(waves: list, concurrency: int = 4) -> dict[str, dict]:
+    """Centralised reference: deterministic beam search (fallback.solve), no models, no negotiation. Scored with
+    the same evaluate() as the arms' totals."""
+    from atm.wave.fallback import solve
+    out: dict[str, dict] = {}
+
+    def one(w):
+        t0 = time.monotonic()
+        try:
+            plan, method = solve(w)
+            ev = evaluate(w, plan)
+            out[w.id] = {"delay_min": ev["totals"]["delay_min"], "fuel_kg": ev["totals"]["fuel_kg"],
+                         "pax_protected_pct": ev["totals"]["pax_protected_pct"],
+                         "feasible": bool(rules.feasible(w, plan)), "method": method,
+                         "elapsed_ms": round((time.monotonic() - t0) * 1000, 1)}
+        except Exception as e:  # noqa: BLE001
+            out[w.id] = {"error": f"{type(e).__name__}: {e}"[:300]}
+            log(f"[optimiser] {w.id}: EXCEPTION {e}")
+
+    with ThreadPoolExecutor(max_workers=max(1, concurrency)) as ex:
+        list(ex.map(one, waves))
+    return out
+
+
+def optimiser_summary(opt: dict[str, dict], common: set[str]) -> dict:
+    rows = [opt[w] for w in sorted(common) if "error" not in opt.get(w, {"error": 1})]
+    d = [r["delay_min"] for r in rows]
+    return {"n": len(rows), "delay_min": mean(d), "delay_min_ci95": ci95(d),
+            "fuel_kg": mean([r["fuel_kg"] for r in rows]),
+            "pax_protected_pct": mean([r["pax_protected_pct"] for r in rows]),
+            "n_feasible": sum(r["feasible"] for r in rows),
+            "elapsed_ms_mean": mean([r["elapsed_ms"] for r in rows]),
+            "methods": dict(Counter(r["method"] for r in rows))}
+
+
+def arm_vs_optimiser(arm_delay: dict[str, float], sq_delay: dict[str, float], sq_feasible: set[str],
+                     opt: dict[str, dict], common: set[str]) -> dict:
+    """arm_delay / sq_delay: wave id -> delay_min. gap over common waves; share over waves with a feasible status quo
+    where the optimiser beats it."""
+    ids = [w for w in sorted(common) if w in arm_delay and "error" not in opt.get(w, {"error": 1})]
+    gap = [arm_delay[w] - opt[w]["delay_min"] for w in ids]
+    sub = [w for w in ids if w in sq_feasible and opt[w]["delay_min"] < sq_delay[w]]
+    share = None
+    if sub:
+        den = sum(sq_delay[w] - opt[w]["delay_min"] for w in sub)
+        share = round(100.0 * sum(sq_delay[w] - arm_delay[w] for w in sub) / den, 2) if den else None
+    return {"delay_min_ci95": ci95([arm_delay[w] for w in ids]),
+            "gap_to_optimiser": mean(gap) if gap else None,
+            "share_of_optimiser_gain_pct": share, "share_n": len(sub)}
 
 
 def run_ablation(waves: list) -> float | None:
@@ -410,10 +469,26 @@ def markdown(rep: dict) -> str:
                  f"| {s['fallback_rate_pct']} | {s['rule_violations_in_agreed_plans']} | {s['delay_min']} | {s['fuel_kg']} "
                  f"| {s['pax_protected_pct']} | {s['overtime_min']} | {s['agreement_with_formula_pct']} | {_f(s['brier'])} "
                  f"| {_f(s['latency_p50_ms'])} | {_f(s['latency_p95_ms'])} | {s['error_rate_pct']} |")
+    op = rep.get("optimiser")
+    if op:
+        L.insert(L.index(f"| status quo | - | - | - | - | - | {b['delay_min']} | {b['fuel_kg']} | {b['pax_protected_pct']} "
+                         f"| {b['overtime_min']} | - | - | - | - | - |") + 1,
+                 f"| Optimiser (centralised beam search, no negotiation) | - | - | - | - | {op['n'] - op['n_feasible']} "
+                 f"| {op['delay_min']} | {op['fuel_kg']} | {op['pax_protected_pct']} | - | - | - | - | - | - |")
     fo = b["feasible_only"]
     L += ["", f"Status quo infeasible on {len(b['infeasible_ids'])} waves: {', '.join(b['infeasible_ids']) or 'none'}.", ""]
     L += [f"- {a['label']} vs status quo on {b['n_feasible']} feasible-status-quo waves: delay "
           f"{a['delay_min_vs_feasible_status_quo']} min vs {fo['delay_min']} min" for a in rep["arms"]]
+    if op:
+        ci = lambda c: "n/a" if c is None else f"[{c[0]}, {c[1]}]"  # noqa: E731
+        L += ["", f"Optimiser reference (n={op['n']}, {op['n_feasible']} feasible): mean delay {op['delay_min']} min, "
+                  f"95% CI {ci(op['delay_min_ci95'])}; no models, no negotiation."]
+        for a in rep["arms"]:
+            sh = a.get("share_of_optimiser_gain_pct")
+            L.append(f"- {a['label']}: delay 95% CI {ci(a.get('delay_min_ci95'))}; gap to optimiser "
+                     f"{_f(a.get('gap_to_optimiser'))} min; share of optimiser gain over status quo "
+                     f"{'n/a' if sh is None else f'{sh}%'} (n={a.get('share_n', 0)} waves with feasible status quo "
+                     "beaten by the optimiser).")
     sel = rep["selection"]
     o = rep["outage_test"]
     ab = rep["ablation_no_engine_unsafe_pct"]
@@ -475,13 +550,18 @@ def main(argv: list[str] | None = None) -> dict:
     base["infeasible_ids"] = sq_bad
     base["feasible_only"] = {k: mean([r["baseline"]["evaluation"]["totals"][k] for r in sq_f]) for k in keys}
 
+    opt = run_optimiser(waves, a.concurrency)
+    optimiser = optimiser_summary(opt, common)
+    sq_delay = {w: formula_runs[w]["result"]["baseline"]["evaluation"]["totals"]["delay_min"] for w in common}
     arms, failures = [], list(build_fail)
     for arm in arm_list:
         prov, model = arm_parts(arm)
         summ, extra = summarize(all_runs[arm], formula_runs, waves, common)
         arm_delay = mean([all_runs[arm][w]["result"]["evaluation"]["totals"]["delay_min"] for w in sq_ok])
         arms.append({"model": model, "provider": prov, "label": model, "summary": summ,
-                     "delay_min_vs_feasible_status_quo": arm_delay, **extra})
+                     "delay_min_vs_feasible_status_quo": arm_delay, **extra,
+                     **arm_vs_optimiser({w: all_runs[arm][w]["result"]["evaluation"]["totals"]["delay_min"]
+                                         for w in common}, sq_delay, set(sq_ok), opt, common)})
         failures += collect_failures(model, all_runs[arm], waves)
 
     selection, best_model = select(arms, len(waves), base)
@@ -498,6 +578,7 @@ def main(argv: list[str] | None = None) -> dict:
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "n_waves": len(waves), "n_common": len(common), "seed": a.seed,
         "source": "fixtures" if a.fixtures else a.source, "arms": arms, "baseline": base,
+        "optimiser": optimiser,
         "ablation_no_engine_unsafe_pct": None if a.no_ablation else run_ablation(waves),
         "outage_test": outage,
         "selection": selection, "failures": failures, "wave_ids": [w.id for w in waves],
