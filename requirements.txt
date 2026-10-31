@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+pandas
+pydantic
+anthropic
+typesafe-sdk
+langgraph
+langchain-typesafe
+mcp
+httpx
+pytest
