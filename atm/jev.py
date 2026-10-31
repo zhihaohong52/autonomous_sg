@@ -41,7 +41,7 @@ def available() -> bool:
 
 
 def _sdk():
-    import typesafe  # typesafe-sdk
+    import typesafe_sdk as typesafe
     return typesafe
 
 
