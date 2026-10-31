@@ -30,7 +30,7 @@ When weather or a late inbound aircraft disrupts an arrival, an airline duty man
 
 Pick any disrupted flight from the challenge's flights.csv. The app rebuilds its arrival wave with the airport's real runways, gates and weather. ATC, the Pilot and Ground then negotiate a revised arrival time, runway and gate, each acting only within its own authority, for at most 3 turns. A deterministic engine checks every move against 12 safety rules, so no model can approve an unsafe plan. If the agents cannot agree, a deterministic solver decides and the log says why. Claude writes a short brief, and the duty manager approves or overrides.
 
-Across 1,000 real disruptions the agents agreed on 99.5% of waves, mostly in the first turn, with zero rule violations.
+Across 1,000 real disruptions the agents agreed on 99.5% of waves, mostly in the first turn, and every agreed plan passed all 12 rules.
 
 ---
 
