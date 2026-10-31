@@ -1,0 +1,34 @@
+---
+config:
+  flowchart:
+    curve: linear
+---
+graph TD;
+	__start__([<p>__start__</p>]):::first
+	triage(triage)
+	open(open)
+	moves(moves)
+	counter(counter)
+	check(check)
+	vote(vote)
+	decide_round(decide_round)
+	concede(concede)
+	fallback(fallback)
+	finalize(finalize)
+	__end__([<p>__end__</p>]):::last
+	__start__ --> triage;
+	check --> vote;
+	concede --> moves;
+	counter --> check;
+	decide_round -.-> concede;
+	decide_round -.-> fallback;
+	decide_round -.-> finalize;
+	fallback --> finalize;
+	moves --> counter;
+	open --> moves;
+	triage --> open;
+	vote --> decide_round;
+	finalize --> __end__;
+	classDef default fill:#f2f0ff,line-height:1.2
+	classDef first fill-opacity:0
+	classDef last fill:#bfb6fc
