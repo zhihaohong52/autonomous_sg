@@ -503,7 +503,7 @@ async def negotiate_wave(request: Request, body: dict = Body(...)):
     if stream is False:
         msgs: list[dict] = []
         try:
-            res = await asyncio.to_thread(GR.negotiate_wave, wave, mode, chain, msgs.append)
+            res = await asyncio.to_thread(lambda: GR.negotiate_wave(wave, mode, chain, msgs.append, narrate=True))
         except Exception as e:  # noqa: BLE001
             return _err(500, "negotiation_failed", f"{type(e).__name__}: {e}")
         return finish(res, msgs)

@@ -63,7 +63,7 @@ flowchart LR
   end
 
   ENGINE["Rule engine (deterministic)<br/>12 rules, cites source and values<br/>lists legal moves, CHECKs every plan"]
-  DEC["Decision layer: picks a move / votes<br/>formulas (default) or one model:<br/>jev-1.14 → d1-ultra → elephant-1 → formula<br/>(next only on timeout or invalid answer)"]
+  DEC["Decision layer: picks a move / votes<br/>jev-1.14 (default, benchmark winner) or formulas; one model at a time:<br/>jev-1.14 → d1-ultra → elephant-1 → formula<br/>(next only on timeout or invalid answer)"]
   FB["Fallback solver (deterministic)<br/>beam search + safety net<br/>if no consensus after 3 turns"]
   NAR["Claude Haiku 5.5<br/>writes the duty-manager brief<br/>(explains only, decides nothing)"]
 
@@ -172,6 +172,7 @@ Every change and assumption is returned in `result.limits`. Summary:
 | Ground shift | 8 h, overtime at 1.5x is a cost, not illegal | workbook |
 | Gate change notice | At least 20 min; remote stand exempt | workbook |
 | Speed reduction | Capped at 8 min | assumption |
+| Taxi-in time | 6 min near / 10 min far (runway and pier paired by halves), remote stand far plus 10 min bus; no taxiway closures. The data has gate names but no gate positions or taxiway network | assumption |
 
 ## 4. Data and provenance
 
@@ -194,7 +195,7 @@ Layers missing for a flight fall back to a generic model and are badged in the U
 
 ## 5. Evaluation
 
-**What the measured impact is:** every final plan obeys every rule (0 violations in every arm), while the uncoordinated status quo breaks at least one rule on 16 of 50 waves; with the rule engine switched off, 32% of the agents' plans are illegal; a decision takes about 1 s in formulas mode (`stats.elapsed_ms`). Delay is roughly neutral: on the 34 waves where the status quo is legal, the negotiated plans are about 2 min better in total. Negotiation buys legality and speed, not minutes.
+**What the measured impact is:** every final plan obeys every rule (0 violations in every arm), while the uncoordinated status quo breaks at least one rule on 16 of 50 waves; with the rule engine switched off, 32% of the agents' plans are illegal; a negotiation takes about 1 s in formulas mode and 4-8 s with jev-1.14 (`stats.elapsed_ms`). Delay is roughly neutral: on the 34 waves where the status quo is legal, the negotiated plans are about 2 min better in total. Negotiation buys legality first; minutes are a small bonus.
 
 Method (`python3 -m atm.wave.benchmark --n 50 --arms <models>,formula --concurrency 4 --seed 7`):
 
@@ -213,24 +214,24 @@ Method (`python3 -m atm.wave.benchmark --n 50 --arms <models>,formula --concurre
 - Engine-off ablation: the share of formula-arm final plans that are infeasible under the real rules when the rules engine is disabled.
 
 <!-- BENCHMARK -->
-Run: `python3 -m atm.wave.benchmark --source flights2015 --n 50 --arms openrouter:typesafe/jev-1.14,openrouter:liquid/d1-ultra,openrouter:baseten/elephant-1,formula --concurrency 4 --seed 7 --outage-n 20` (31 Oct 2026, live models, final rules). Same 50 flights.csv rows (seeded, stratified over 30 hubs) for every arm; all arms finished all 50. "Old prompts" is the same run before the prompt change below (raw: same command at the previous commit).
+Run: `python3 -m atm.wave.benchmark --source flights2015 --n 50 --arms openrouter:typesafe/jev-1.14,openrouter:liquid/d1-ultra,openrouter:baseten/elephant-1,formula --concurrency 4 --seed 7 --outage-n 20` (31 Oct 2026, live models, final rules). Same 50 flights.csv rows (seeded, stratified over 30 hubs) for every arm; all arms finished all 50.
 
-| Arm | Consensus (old prompts → judgement-only) | Mean turns | Solver fallback | Rule violations | Total delay, all wave arrivals (min) [95% CI] | Gap to optimiser (min) | Pax protected | Brier* | p50 / p95 ms | Errors | Same plan as formulas |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| typesafe/jev-1.14 | 94% → **98%** | 1.32 | 2% | 0 | 362.0 [313, 411] | 11.7 | 24.6% | 0.0055 | 529 / 670 | 0% | 62% |
-| liquid/d1-ultra | 82% → **98%** | 1.32 | 2% | 0 | 362.2 [313, 412] | 12.0 | 24.3% | 0.0015 | 648 / 916 | 0% | 80% |
-| baseten/elephant-1 | 68% → **98%** | 1.32 | 2% | 0 | 362.2 [313, 411] | 11.9 | 24.6% | 0.0108 | 602 / 722 | 0% | 70% |
-| formula | 98% | 1.32 | 2% | 0 | 351.7 [305, 398] | 1.4 | 25.5% | n/a | n/a / n/a | 0% | 100% |
-| centralised optimiser (beam search, no negotiation) | - | - | - | 0 infeasible | 350.3 [303, 397] | 0 | 25.8% | - | ~2.3 s/wave | - | - |
-| status quo (no negotiation) | - | - | - | breaks a rule on 16/50 waves | 343.5 | - | 26.5% | - | - | - | - |
+| Arm | Consensus (raw-number prompts → judgement-only) | Mean turns | Rule violations | Total delay, all wave arrivals (min) [95% CI] | Gap to optimiser (min) | Pax protected | Brier* | p50 / p95 ms | Errors | Same plan as formulas |
+|---|---|---|---|---|---|---|---|---|---|---|
+| typesafe/jev-1.14 | 94% → **98%** | 1.32 | 0 | 351.7 [305, 398] | 1.4 | 25.8% | 0.0060 | 480 / 602 | 0% | 74% |
+| liquid/d1-ultra | 82% → **96%** | 1.34 | 0 | 351.9 [305, 398] | 1.7 | 25.5% | 0.0016 | 622 / 822 | 0% | 86% |
+| baseten/elephant-1 | 68% → **98%** | 1.34 | 0 | 351.9 [305, 398] | 1.6 | 25.8% | 0.0135 | 557 / 647 | 0% | 72% |
+| formula | 98% | 1.32 | 0 | 351.7 [305, 398] | 1.4 | 25.5% | n/a | n/a / n/a | 0% | 100% |
+| centralised optimiser (beam search, no negotiation) | - | - | 0 infeasible | 350.3 [303, 397] | 0 | 25.8% | - | ~2.3 s/wave | - | - |
+| status quo (no negotiation) | - | - | breaks a rule on 16/50 waves | 343.5 | - | 26.5% | - | - | - | - |
 
 \* Brier is measured against the formula verdict (accept if utility >= reservation), not ground truth.
 
-- **Code does the maths, the model judges.** Following TypeSafe's System One guidance ("keep deterministic work in code"), the decision models no longer see raw utilities. Code pre-computes every comparison into words: for each move, whether it fixes or adds rule breaches, whether it is better or worse for the agent, and the engine's rank; for each vote, whether the plan meets the agent's minimum this turn, with explicit yes/no criteria. The model only makes the final pick and the accept/reject. **Result: all three models went to 98% consensus in 1.32 turns, the same as the formulas** (jev-1.14 94%, d1-ultra 82%, elephant-1 68% before), with 0 errors and 0 rule violations.
-- **What it did not fix:** the models' plans carry about 10 min more total delay than the formula arm (about 12 min above the optimiser, against 1.4 min for the formulas). The models pick different moves among options the engine ranks close (they match the formula's plan on 62-80% of waves). The 95% intervals overlap widely (±47 min), so at n = 50 this difference is not significant, but we report it as it is.
-- **Selection: `formula`** by the rule: best outcome among arms with error < 2%, p95 < 1 s and consensus >= 90%; tie -> lower Brier. All three models now pass every gate (error < 2%, p95 < 1 s, consensus >= 90%); the formulas win on mean delay. The app defaults to formulas mode; decision mode is opt-in (jev-1.14 first).
-- **How good is "good"?** The centralised optimiser (the beam-search solver run on each wave with no negotiation) is the reference for the best plan one coordinator finds. The formula agents land within 1.4 min of it: decentralised negotiation between three self-interested agents loses almost nothing against central control.
-- **Status quo, honestly:** it breaks at least one rule on 16 of 50 waves. On the 34 waves where it is legal, its mean delay is 339.2 min, about 2 min better than the negotiated plans on those waves: negotiation buys legality, not minutes.
+- **Code does the maths, the model judges.** Following TypeSafe's System One guidance ("keep deterministic work in code"), the decision models never see raw utilities. Code pre-computes every comparison into words: per move, whether it fixes or adds rule breaches, whether it is better or worse for the agent, and the engine's rank; per vote, whether the plan meets the agent's minimum this turn, with explicit yes/no criteria. The model only makes the final pick and the accept/reject. The model is offered exactly the moves the formula may take (a Pilot may divert only for its own fuel problem or when every runway is closed).
+- **Result: the decision models now match the formulas.** jev-1.14 reaches 98% consensus in 1.32 turns with 351.7 min total delay, 1.4 min from the optimiser (formulas: 351.7, 1.4). With raw numbers in the prompt the same models reached 68-94% consensus and jev-1.14 carried 10 min more delay.
+- **Selection: `typesafe/jev-1.14`** by the rule: best outcome among arms with error < 2%, p95 < 1 s and consensus >= 90%; tie -> lower Brier
+- **How good is "good"?** The centralised optimiser (the beam-search solver run on each wave with no negotiation) is the reference for what one coordinator would pick. Three self-interested agents negotiating land within about 1.5 min of it.
+- **Status quo:** it breaks at least one rule on 16 of 50 waves. On the 34 waves where it is legal, the negotiated plans are also faster: 337.2 min (formulas) and 337.5 min (jev-1.14) against 339.2 min for the status quo.
 - **Safety:** 0 rule violations in any final plan, every arm. **Engine-off ablation:** 32% of the agents' final plans break a rule when the engine is disabled.
 - **Outage test:** primary model replaced by a dead endpoint on 20 waves; 20/20 resolved with a legal plan.
 - Full report: `eval/BENCHMARK.md`, raw data `eval/benchmark.json`.
@@ -239,13 +240,13 @@ Run: `python3 -m atm.wave.benchmark --source flights2015 --n 50 --arms openroute
 ### Demo replays
 
 Recorded runs in `data/replay/` (live jev-1.14) play back with no model calls. Waves without a recording run live.
-- `F2015-69315` ATL, fog: with jev-1.14, no agreement in 3 turns; the deterministic solver lands DL2239 on 08L at gate T14, +26 min (the fallback path, with its reason in the log). In the default formulas mode this wave reaches consensus.
+- `F2015-69315` ATL, fog: DL2239 on 08R, gate E16, +26 min; agreed in turn 2 after the agents concede.
 - `F2015-75` DFW, crosswind runway closures: AA1344 on 13L, gate A38, +119 min; agreed in turn 1.
 - `F2015-77162` DEN, closures: DL927 on runway 25, gate C35, +133 min; turn 1.
 - `F2015-270287` ORD: OO5559 on 09L, gate B18, +57 min; turn 1.
-- `F2015-58926` MIA: UA1634 diverts to FLL (about 134 min); agreed in turn 2.
+- `F2015-58926` MIA: UA1634 on runway 12, gate A1, +32 min; agreed in turn 2.
 
-Failure case in the default mode, live (no recording): `F2015-102056` (DL2019). In turns 1-3 no plan on the table passes the engine CHECK, so the log shows three `NO_CONSENSUS` messages and a `FALLBACK` with its reason; the safety net diverts DL2019 to CSG (about 320 min). The system declines to invent a plan it cannot prove legal.
+Failure case, live (no recording): `F2015-102056` (DL2019). In turns 1-3 no plan on the table passes the engine CHECK, so the log shows three `NO_CONSENSUS` messages and a `FALLBACK` with its reason; the safety net diverts DL2019 to CSG (about 320 min). The system declines to invent a plan it cannot prove legal.
 
 ## 6. What went wrong and what we fixed
 

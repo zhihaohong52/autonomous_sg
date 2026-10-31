@@ -84,6 +84,10 @@ LIMITS = [
      "of the capacity cap; crosswind/tailwind limits from FAA Order 8400.9 / AFM"},
     {"limit": "remote stand", "value": "1 stand, 2 positions", "source": "assumption",
      "note": "not in workbook; spare_gates from workbook remain binding; exempt from gate notice"},
+    {"limit": "taxi-in time", "value": "6 min near / 10 min far; remote stand far + 10 min bus", "source": "assumption",
+     "note": "no gate coordinates or taxiway network in the data (OSM gates have names only): runway and pier "
+             "are paired by halves of the airport's runway list and piers; feeds in-block time, delay, "
+             "connections and gate occupancy; ATC-TAXI-ROUTE reports it, no taxiway closures modelled"},
     {"limit": "speed reduction cap", "value": f"{MAX_SPEED_REDUCTION_MIN:g} min", "source": "assumption",
      "note": "maximum en-route speed reduction a pilot may use to absorb delay"},
     {"limit": "turnaround / gate occupancy", "value": "airport min_turnaround_min", "source": "workbook",

@@ -368,6 +368,10 @@ def _agent_moves(run: _Run, agent: str, rnd: int, table: JointPlan, known: set[s
         stop = False
         for _attempt in range(MAX_REJECTIONS_PER_SLOT):  # each failed attempt is one rejection
             avail = {k: v for k, v in info.items() if k not in excluded}
+            # a PILOT may divert only for its own fuel problem or when every runway is closed: the model is
+            # offered exactly the moves the formula may take (it was offered unjustified diversions before)
+            avail = {k: v for k, v in avail.items()
+                     if not (v[0].kind == "request_divert" and not divert_ok)} or avail
             if not avail:
                 stop = True
                 break

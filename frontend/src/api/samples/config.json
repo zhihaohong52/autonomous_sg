@@ -14,8 +14,15 @@
     "decision",
     "decision+claude"
   ],
-  "default_mode": "formulas",
+  "default_mode": "decision",
   "models": [
+    {
+      "id": "typesafe/jev-1.14",
+      "provider": "openrouter",
+      "label": "Typesafe jev-1.14",
+      "available": true,
+      "benchmark_rank": 1
+    },
     {
       "id": "liquid/d1-ultra",
       "provider": "openrouter",
@@ -41,7 +48,7 @@
       "provider": "formula",
       "label": "Formula (deterministic)",
       "available": true,
-      "benchmark_rank": 1
+      "benchmark_rank": 4
     }
   ],
   "default_model": "typesafe/jev-1.14",

@@ -1,5 +1,5 @@
 {
-  "run_id": "6dc98cea73a1",
+  "run_id": "1ac5f5e5dbf7",
   "wave_id": "F2015-270287",
   "mode": "decision",
   "model": "typesafe/jev-1.14",
@@ -106,6 +106,12 @@
       "value": "1 stand, 2 positions",
       "source": "assumption",
       "note": "not in workbook; spare_gates from workbook remain binding; exempt from gate notice"
+    },
+    {
+      "limit": "taxi-in time",
+      "value": "6 min near / 10 min far; remote stand far + 10 min bus",
+      "source": "assumption",
+      "note": "no gate coordinates or taxiway network in the data (OSM gates have names only): runway and pier are paired by halves of the airport's runway list and piers; feeds in-block time, delay, connections and gate occupancy; ATC-TAXI-ROUTE reports it, no taxiway closures modelled"
     },
     {
       "limit": "speed reduction cap",
@@ -1765,13 +1771,13 @@
   "stats": {
     "model_calls": 9,
     "fallbacks": 0,
-    "elapsed_ms": 4304
+    "elapsed_ms": 4312
   },
   "log": [
     {
       "seq": 0,
       "round": 0,
-      "ts": "2026-10-31T06:15:26.571689+00:00",
+      "ts": "2026-10-31T07:37:13.521220+00:00",
       "sender": "DECIDER",
       "type": "TRIAGE",
       "body": {
@@ -1785,34 +1791,34 @@
           "4 critical: most runways unusable or very long delays"
         ],
         "probabilities": [
-          0.03,
+          0.02,
           0.08,
           0.15,
-          0.67,
+          0.68,
           0.07
         ],
-        "confidence": 0.61
+        "confidence": 0.63
       },
       "rationale": "Severity 3/4 (worst delay 331 min, 14/14 runways within wind limits); up to 3 moves per agent per turn",
       "decision": {
         "kind": "score",
         "model": "typesafe/jev-1.14-20261014",
         "provider": "openrouter",
-        "latency_ms": 446,
+        "latency_ms": 425,
         "probabilities": {
-          "0": 0.03,
+          "0": 0.02,
           "1": 0.08,
           "2": 0.15,
-          "3": 0.67,
+          "3": 0.68,
           "4": 0.07
         },
-        "confidence": 0.61
+        "confidence": 0.63
       }
     },
     {
       "seq": 1,
       "round": 0,
-      "ts": "2026-10-31T06:15:26.573528+00:00",
+      "ts": "2026-10-31T07:37:13.524414+00:00",
       "sender": "ENGINE",
       "type": "OPEN",
       "body": {
@@ -2650,7 +2656,7 @@
     {
       "seq": 2,
       "round": 1,
-      "ts": "2026-10-31T06:15:28.519401+00:00",
+      "ts": "2026-10-31T07:37:15.569270+00:00",
       "sender": "ATC",
       "type": "AGENT_TURN",
       "body": {
@@ -2678,23 +2684,23 @@
               "kind": "choice",
               "model": "typesafe/jev-1.14-20261014",
               "provider": "openrouter",
-              "latency_ms": 471,
+              "latency_ms": 456,
               "probabilities": {
-                "ATC:change_runway:MQ3318:runway=09C": 0.29,
-                "ATC:change_runway:MQ3318:runway=09L": 0.05,
-                "ATC:change_runway:MQ3318:runway=09R": 0.05,
-                "ATC:change_runway:MQ3318:runway=10C": 0.04,
-                "ATC:change_runway:MQ3318:runway=10L": 0.02,
-                "ATC:change_runway:MQ3318:runway=10R": 0.01,
-                "ATC:change_runway:MQ3327:runway=09C": 0.26,
-                "ATC:change_runway:MQ3327:runway=09L": 0.07,
-                "ATC:change_runway:MQ3327:runway=09R": 0.04,
+                "ATC:change_runway:MQ3318:runway=09C": 0.9,
+                "ATC:change_runway:MQ3318:runway=09L": 0.01,
+                "ATC:change_runway:MQ3318:runway=09R": 0.0,
+                "ATC:change_runway:MQ3318:runway=10C": 0.0,
+                "ATC:change_runway:MQ3318:runway=10L": 0.0,
+                "ATC:change_runway:MQ3318:runway=10R": 0.0,
+                "ATC:change_runway:MQ3327:runway=09C": 0.01,
+                "ATC:change_runway:MQ3327:runway=09L": 0.0,
+                "ATC:change_runway:MQ3327:runway=09R": 0.0,
                 "ATC:change_runway:MQ3327:runway=10C": 0.04,
-                "ATC:change_runway:MQ3327:runway=10L": 0.03,
-                "ATC:change_runway:MQ3327:runway=10R": 0.02,
-                "pass": 0.08
+                "ATC:change_runway:MQ3327:runway=10L": 0.02,
+                "ATC:change_runway:MQ3327:runway=10R": 0.0,
+                "pass": 0.02
               },
-              "confidence": 0.23
+              "confidence": 0.89
             }
           },
           {
@@ -2716,23 +2722,23 @@
               "kind": "choice",
               "model": "typesafe/jev-1.14-20261014",
               "provider": "openrouter",
-              "latency_ms": 464,
+              "latency_ms": 535,
               "probabilities": {
-                "ATC:change_runway:MQ3327:runway=09C": 0.5,
-                "ATC:change_runway:MQ3327:runway=09L": 0.07,
-                "ATC:change_runway:MQ3327:runway=09R": 0.08,
-                "ATC:change_runway:MQ3327:runway=10C": 0.06,
-                "ATC:change_runway:MQ3327:runway=10L": 0.02,
-                "ATC:change_runway:MQ3327:runway=10R": 0.02,
-                "ATC:change_runway:OO5559:runway=09C": 0.05,
-                "ATC:change_runway:OO5559:runway=09L": 0.03,
-                "ATC:change_runway:OO5559:runway=09R": 0.04,
+                "ATC:change_runway:MQ3327:runway=09C": 0.87,
+                "ATC:change_runway:MQ3327:runway=09L": 0.01,
+                "ATC:change_runway:MQ3327:runway=09R": 0.0,
+                "ATC:change_runway:MQ3327:runway=10C": 0.0,
+                "ATC:change_runway:MQ3327:runway=10L": 0.0,
+                "ATC:change_runway:MQ3327:runway=10R": 0.0,
+                "ATC:change_runway:OO5559:runway=09C": 0.01,
+                "ATC:change_runway:OO5559:runway=09L": 0.0,
+                "ATC:change_runway:OO5559:runway=09R": 0.0,
                 "ATC:change_runway:OO5559:runway=10C": 0.04,
-                "ATC:change_runway:OO5559:runway=10L": 0.02,
-                "ATC:change_runway:OO5559:runway=10R": 0.02,
+                "ATC:change_runway:OO5559:runway=10L": 0.01,
+                "ATC:change_runway:OO5559:runway=10R": 0.01,
                 "pass": 0.05
               },
-              "confidence": 0.46
+              "confidence": 0.86
             }
           },
           {
@@ -2754,23 +2760,23 @@
               "kind": "choice",
               "model": "typesafe/jev-1.14-20261014",
               "provider": "openrouter",
-              "latency_ms": 464,
+              "latency_ms": 469,
               "probabilities": {
-                "ATC:change_runway:OO5559:runway=09L": 0.38,
-                "ATC:change_runway:OO5559:runway=09R": 0.12,
-                "ATC:change_runway:OO5559:runway=10C": 0.08,
-                "ATC:change_runway:OO5559:runway=10L": 0.05,
-                "ATC:change_runway:OO5559:runway=10R": 0.03,
-                "ATC:change_runway:OO5570:runway=09L": 0.11,
-                "ATC:change_runway:OO5570:runway=09R": 0.05,
-                "ATC:change_runway:OO5570:runway=10C": 0.03,
-                "ATC:change_runway:OO5570:runway=10L": 0.02,
+                "ATC:change_runway:OO5559:runway=09L": 0.92,
+                "ATC:change_runway:OO5559:runway=09R": 0.01,
+                "ATC:change_runway:OO5559:runway=10C": 0.01,
+                "ATC:change_runway:OO5559:runway=10L": 0.0,
+                "ATC:change_runway:OO5559:runway=10R": 0.0,
+                "ATC:change_runway:OO5570:runway=09L": 0.01,
+                "ATC:change_runway:OO5570:runway=09R": 0.0,
+                "ATC:change_runway:OO5570:runway=10C": 0.0,
+                "ATC:change_runway:OO5570:runway=10L": 0.0,
                 "ATC:change_runway:OO5570:runway=10R": 0.02,
-                "ATC:change_runway:MQ3318:runway=09L": 0.07,
-                "ATC:change_runway:MQ3318:runway=09R": 0.02,
+                "ATC:change_runway:MQ3318:runway=09L": 0.01,
+                "ATC:change_runway:MQ3318:runway=09R": 0.0,
                 "pass": 0.02
               },
-              "confidence": 0.33
+              "confidence": 0.91
             }
           }
         ],
@@ -2864,16 +2870,16 @@
             "vote": "REJECT",
             "utility": 0.6,
             "reservation": 0.791,
-            "p_accept": 0.05,
-            "reason": "typesafe/jev-1.14-20261014: P(accept)=0.05 (utility 0.600, reservation 0.791)"
+            "p_accept": 0.04,
+            "reason": "typesafe/jev-1.14-20261014: P(accept)=0.04 (utility 0.600, reservation 0.791)"
           },
           {
             "plan_id": "c22ae40bd4",
             "vote": "ACCEPT",
             "utility": 0.879,
             "reservation": 0.791,
-            "p_accept": 0.92,
-            "reason": "typesafe/jev-1.14-20261014: P(accept)=0.92 (utility 0.879, reservation 0.791)"
+            "p_accept": 0.97,
+            "reason": "typesafe/jev-1.14-20261014: P(accept)=0.97 (utility 0.879, reservation 0.791)"
           }
         ],
         "rationale": "Turn 1: Move MQ3318 from 22R to runway 09C; Move MQ3327 from 22R to runway 09C; Move OO5559 from 22R to runway 09L; 0 move(s) vetoed by the engine; own utility 0.879; accepts 1/2 valid plan(s) at reservation 0.791",
@@ -2881,7 +2887,7 @@
           "kind": "noul",
           "model": "typesafe/jev-1.14-20261014",
           "provider": "openrouter",
-          "latency_ms": 463
+          "latency_ms": 500
         }
       },
       "rationale": "Turn 1: Move MQ3318 from 22R to runway 09C; Move MQ3327 from 22R to runway 09C; Move OO5559 from 22R to runway 09L; 0 move(s) vetoed by the engine; own utility 0.879; accepts 1/2 valid plan(s) at reservation 0.791",
@@ -2889,13 +2895,13 @@
         "kind": "noul",
         "model": "typesafe/jev-1.14-20261014",
         "provider": "openrouter",
-        "latency_ms": 463
+        "latency_ms": 500
       }
     },
     {
       "seq": 3,
       "round": 1,
-      "ts": "2026-10-31T06:15:28.519767+00:00",
+      "ts": "2026-10-31T07:37:15.570445+00:00",
       "sender": "ENGINE",
       "type": "CHECK",
       "body": {
@@ -2910,7 +2916,7 @@
     {
       "seq": 4,
       "round": 1,
-      "ts": "2026-10-31T06:15:29.457868+00:00",
+      "ts": "2026-10-31T07:37:16.495196+00:00",
       "sender": "PILOT:OO5559",
       "type": "AGENT_TURN",
       "body": {
@@ -3009,16 +3015,16 @@
             "vote": "ACCEPT",
             "utility": 0.45,
             "reservation": 0.417,
-            "p_accept": 0.74,
-            "reason": "typesafe/jev-1.14-20261014: P(accept)=0.74 (utility 0.450, reservation 0.417)"
+            "p_accept": 0.89,
+            "reason": "typesafe/jev-1.14-20261014: P(accept)=0.89 (utility 0.450, reservation 0.417)"
           },
           {
             "plan_id": "c22ae40bd4",
             "vote": "ACCEPT",
             "utility": 0.463,
             "reservation": 0.417,
-            "p_accept": 0.84,
-            "reason": "typesafe/jev-1.14-20261014: P(accept)=0.84 (utility 0.463, reservation 0.417)"
+            "p_accept": 0.96,
+            "reason": "typesafe/jev-1.14-20261014: P(accept)=0.96 (utility 0.463, reservation 0.417)"
           }
         ],
         "rationale": "Turn 1: no move (keeps the plan on the table); 0 move(s) vetoed by the engine; own utility 0.463; accepts 2/2 valid plan(s) at reservation 0.417",
@@ -3026,7 +3032,7 @@
           "kind": "noul",
           "model": "typesafe/jev-1.14-20261014",
           "provider": "openrouter",
-          "latency_ms": 444
+          "latency_ms": 454
         }
       },
       "rationale": "Turn 1: no move (keeps the plan on the table); 0 move(s) vetoed by the engine; own utility 0.463; accepts 2/2 valid plan(s) at reservation 0.417",
@@ -3034,13 +3040,13 @@
         "kind": "noul",
         "model": "typesafe/jev-1.14-20261014",
         "provider": "openrouter",
-        "latency_ms": 444
+        "latency_ms": 454
       }
     },
     {
       "seq": 5,
       "round": 1,
-      "ts": "2026-10-31T06:15:30.425182+00:00",
+      "ts": "2026-10-31T07:37:17.402081+00:00",
       "sender": "GROUND",
       "type": "AGENT_TURN",
       "body": {
@@ -3139,16 +3145,16 @@
             "vote": "ACCEPT",
             "utility": 0.615,
             "reservation": 0.585,
-            "p_accept": 0.75,
-            "reason": "typesafe/jev-1.14-20261014: P(accept)=0.75 (utility 0.615, reservation 0.585)"
+            "p_accept": 0.77,
+            "reason": "typesafe/jev-1.14-20261014: P(accept)=0.77 (utility 0.615, reservation 0.585)"
           },
           {
             "plan_id": "c22ae40bd4",
             "vote": "ACCEPT",
             "utility": 0.65,
             "reservation": 0.585,
-            "p_accept": 0.86,
-            "reason": "typesafe/jev-1.14-20261014: P(accept)=0.86 (utility 0.650, reservation 0.585)"
+            "p_accept": 0.97,
+            "reason": "typesafe/jev-1.14-20261014: P(accept)=0.97 (utility 0.650, reservation 0.585)"
           }
         ],
         "rationale": "Turn 1: no move (keeps the plan on the table); 0 move(s) vetoed by the engine; own utility 0.650; accepts 2/2 valid plan(s) at reservation 0.585",
@@ -3156,7 +3162,7 @@
           "kind": "noul",
           "model": "typesafe/jev-1.14-20261014",
           "provider": "openrouter",
-          "latency_ms": 487
+          "latency_ms": 436
         }
       },
       "rationale": "Turn 1: no move (keeps the plan on the table); 0 move(s) vetoed by the engine; own utility 0.650; accepts 2/2 valid plan(s) at reservation 0.585",
@@ -3164,13 +3170,13 @@
         "kind": "noul",
         "model": "typesafe/jev-1.14-20261014",
         "provider": "openrouter",
-        "latency_ms": 487
+        "latency_ms": 436
       }
     },
     {
       "seq": 6,
       "round": 1,
-      "ts": "2026-10-31T06:15:30.426364+00:00",
+      "ts": "2026-10-31T07:37:17.404011+00:00",
       "sender": "ENGINE",
       "type": "CONSENSUS",
       "body": {
