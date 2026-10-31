@@ -7,7 +7,7 @@ from atm.wave import build
 from atm.wave.model import Metar
 
 pytestmark = pytest.mark.skipif(
-    not (build.WAVES / "index.csv").exists() or not (build.WAVES / "arrivals.csv.gz").exists(),
+    not (build.WAVES / "index.csv").exists() or not (build.WAVES / "arrivals").exists(),
     reason="wave data files not present")
 
 

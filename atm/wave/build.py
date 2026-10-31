@@ -3,6 +3,8 @@ OurAirports / FAA data, plus seeded simulation of the layers no public source ha
 (fuel, crew, connections, gate occupancy). Deterministic: same wave_id -> same Wave."""
 from __future__ import annotations
 
+import csv
+import functools
 import hashlib
 import math
 import random
@@ -23,6 +25,8 @@ REPLAY = ROOT / "data" / "replay"
 CH2 = ROOT / "data" / "challenge2"
 
 _CACHE: dict = {}
+_ARR_COLS = ["date", "carrier", "flight_no", "tail", "origin", "sched_dep", "sched_arr", "weather_delay",
+             "nas_delay", "late_aircraft_delay", "carrier_delay", "arr_delay", "cancelled"]
 
 
 # ---------------------------------------------------------------- loading
@@ -35,23 +39,31 @@ def _cached(key, fn):
 
 def _index() -> pd.DataFrame:
     def load():
-        df = pd.read_csv(WAVES / "index.csv", dtype={"date": str})
+        df = pd.read_csv(WAVES / "index.csv", dtype={"date": str, "airport": "category", "hour": "int8",
+                                                    "n_arrivals": "int16", "n_disrupted": "int16"})
         # index.csv writes flight numbers as floats ("AA807.0"); normalise to callsigns
         df["disrupted_flights"] = df["disrupted_flights"].fillna("").str.replace(r"\.0(?=;|$)", "", regex=True)
         return df
     return _cached("index", load)
 
 
-def _arrivals():
-    """(frame, {(dest, date): row positions}) so per-wave filtering is O(window)."""
-    def load():
-        df = pd.read_csv(WAVES / "arrivals.csv.gz", dtype={"date": str, "tail": str, "carrier": str})
-        df = df.dropna(subset=["sched_arr", "carrier", "flight_no"]).reset_index(drop=True)
-        for c in ("weather_delay", "nas_delay", "late_aircraft_delay", "carrier_delay", "arr_delay"):
-            df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0.0)
-        df["cancelled"] = pd.to_numeric(df["cancelled"], errors="coerce").fillna(0) > 0
-        return df, df.groupby(["dest", "date"]).indices
-    return _cached("arrivals", load)
+@functools.lru_cache(maxsize=4)
+def _arrivals(iata: str):
+    """(frame, {date: row positions}) for one destination hub, from the per-airport files written by
+    scripts/split_arrivals.py (the 1.2M-row arrivals.csv.gz is never loaded at runtime: 512 MB host)."""
+    p = WAVES / "arrivals" / f"{iata}.csv.gz"
+    if not p.exists():
+        return None, {}
+    # streamed in chunks (low parse peak), then categoricals rebuilt over the whole airport
+    df = pd.concat(pd.read_csv(p, chunksize=20000, dtype={
+        "date": str, "carrier": str, "origin": str, "tail": str,
+        "flight_no": "int32", "sched_arr": "int32", "sched_dep": "float32",
+        "weather_delay": "float32", "nas_delay": "float32", "late_aircraft_delay": "float32",
+        "carrier_delay": "float32", "arr_delay": "float32", "cancelled": "bool"}),
+        ignore_index=True)
+    for c in ("date", "carrier", "origin", "tail"):
+        df[c] = df[c].astype("category")
+    return df, df.groupby("date", observed=True).indices
 
 
 def _runways_by_airport() -> dict[str, pd.DataFrame]:
@@ -62,13 +74,19 @@ def _runways_by_airport() -> dict[str, pd.DataFrame]:
     return _cached("runways", load)
 
 
-def _metar_table() -> dict:
-    """{(airport, local_hour_key): last observation row (dict)}."""
-    def load():
-        df = pd.read_csv(REF / "metar.csv", dtype={"local_hour_key": str, "wxcodes": str})
-        df = df.sort_values("valid_utc").drop_duplicates(["airport", "local_hour_key"], keep="last")
-        return {(r["airport"], r["local_hour_key"]): r for r in df.to_dict("records")}
-    return _cached("metar", load)
+@functools.lru_cache(maxsize=8)
+def _metar_table(iata: str) -> dict:
+    """{(airport, local_hour_key): last observation row (dict)} for one airport. metar.csv is streamed
+    row by row and filtered, so only that airport's rows are ever resident."""
+    out: dict = {}
+    with open(REF / "metar.csv", newline="") as f:
+        for r in csv.DictReader(f):
+            if r["airport"] != iata:
+                continue
+            k = (iata, r["local_hour_key"])
+            if k not in out or r["valid_utc"] >= out[k]["valid_utc"]:  # latest observation wins
+                out[k] = r
+    return out
 
 
 def _aircraft_table() -> dict:
@@ -192,14 +210,18 @@ def _nearest_alternate(iata: str) -> tuple[str, float]:
 def _window_rows(iata: str, date: str, hour: int) -> pd.DataFrame:
     """Non-cancelled arrivals at `iata` scheduled inside [hour:00, hour+1:00) local,
     one row per callsign, with `callsign`, `sched_min` (minutes vs T0) columns."""
-    df, groups = _arrivals()
-    pos = groups.get((iata, date))
+    df, groups = _arrivals(iata)
+    pos = groups.get(date)
     if pos is None:
-        return df.iloc[0:0].assign(callsign=[], sched_min=[])
+        return pd.DataFrame(columns=_ARR_COLS + ["callsign", "sched_min"])
     w = df.iloc[pos]
     w = w[~w["cancelled"]]
     mins = w["sched_arr"].map(_hhmm_min)
     w = w[(mins >= hour * 60) & (mins < hour * 60 + 60)].copy()
+    for c in ("carrier", "origin", "tail", "date"):  # small slice: plain str, not category
+        w[c] = w[c].astype(object)
+    for c in ("weather_delay", "nas_delay", "late_aircraft_delay", "carrier_delay", "arr_delay", "sched_dep"):
+        w[c] = w[c].astype("float64")
     w["sched_min"] = (mins[w.index] - hour * 60).astype(float)
     w["callsign"] = w["carrier"] + w["flight_no"].astype(int).astype(str)
     return w.sort_values("sched_min").drop_duplicates("callsign")
@@ -228,7 +250,7 @@ def _select(w: pd.DataFrame, disrupted_cs: set[str]) -> tuple[pd.DataFrame, pd.D
 # ---------------------------------------------------------------- weather
 
 def _metar_for(iata: str, date: str, hour: int) -> Metar | None:
-    tbl = _metar_table()
+    tbl = _metar_table(iata)
     d = datetime.strptime(date, "%Y-%m-%d") + timedelta(hours=hour)
     for dt in (d, d - timedelta(hours=1)):
         r = tbl.get((iata, dt.strftime("%Y-%m-%d-%H")))

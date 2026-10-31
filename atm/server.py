@@ -280,7 +280,7 @@ def _sse(event: str, data) -> str:
 
 @app.get("/api/waves")
 def waves(airport: str | None = None, q: str | None = None, limit: int = 50):
-    return WB.list_waves(airport=airport, q=q, limit=limit)
+    return WB.list_waves(airport=airport, q=q, limit=max(0, min(limit, 500)))
 
 
 @app.get("/api/waves/random")

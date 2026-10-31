@@ -25,7 +25,7 @@ def _plan_from_dict(d: dict) -> JointPlan:
 def list_waves(airport: str | None = None, q: str | None = None, limit: int = 20) -> list[dict]:
     """List disrupted arrival waves (summaries), optionally filtered by airport code or a flight/wave id
     substring. Read-only. Legality of any plan is decided only by the deterministic rule engine."""
-    return build.list_waves(airport=airport, q=q, limit=limit)
+    return build.list_waves(airport=airport, q=q, limit=max(0, min(limit, 500)))
 
 
 @mcp.tool()
