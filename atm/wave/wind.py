@@ -24,6 +24,8 @@ TYPE_XWIND_KT: dict[str, int] = {
 }
 TYPE_XWIND_SOURCE = "manufacturer demonstrated crosswind (FCOM/AFM, approx.)"
 
+VRB_CALM_KT = 6.0  # VRB at or below this speed (gust included) is treated as calm
+
 WET_CODES = ("RA", "DZ", "SN", "TS", "GR", "PL", "FZ", "SH")
 
 
@@ -32,8 +34,14 @@ def components(wind_dir: float | None, wind_kt: float, gust_kt: float | None,
     """Return (headwind, crosswind, tailwind) in kt, each >= 0, rounded to 1 decimal."""
     speed = max(wind_kt, gust_kt or 0)
     if wind_dir is None:
-        # Variable or missing direction: assume worst case crosswind.
-        return 0.0, round(speed, 1), round(speed if speed > 3 else 0.0, 1)
+        # Variable / missing direction. VRB is reported for light winds (<= 6 kt) or for winds
+        # varying across >= 180 deg; it applies to every runway equally, so treating it as a full
+        # tailwind closed ALL runways (e.g. VRB06KT). Light VRB is treated as calm; stronger VRB
+        # gets the worst-case crosswind (gust if gusting) but no tailwind (the runway in use is
+        # chosen into the prevailing component).
+        if speed <= VRB_CALM_KT:
+            return 0.0, 0.0, 0.0
+        return 0.0, round(speed, 1), 0.0
     angle = math.radians(wind_dir - heading_true)
     crosswind = abs(speed * math.sin(angle))
     along = math.cos(angle)

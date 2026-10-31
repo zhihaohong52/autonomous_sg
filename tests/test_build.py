@@ -83,3 +83,20 @@ def test_runway_closed_reason_cites_faa(monkeypatch):
     assert closed
     assert all("FAA Order 8400.9" in r.closed_reason for r in closed)
     assert any(r.closed_reason.startswith("crosswind") for r in closed)
+
+
+def test_crew_shift_not_infeasible_by_construction():
+    """Crew shift end is anchored to the delayed ETA: landing at the earliest ETA with typical taxi
+    never breaches GND-CREW-DUTY (regression: ~70% of real flights did before any move)."""
+    from atm.wave.utility import TURNAROUND_MIN, TYPICAL_TAXI_MIN
+    idx = build._index()
+    for wid in idx["wave_id"].head(25):
+        for f in build.build_wave(wid).flights:
+            assert f.crew_shift_end_min >= f.eta_earliest_min + TYPICAL_TAXI_MIN + TURNAROUND_MIN
+            assert f.crew_shift_end_min <= f.eta_earliest_min + TYPICAL_TAXI_MIN + TURNAROUND_MIN + 90
+
+
+def test_wide_body_gate_exists():
+    idx = build._index()
+    for wid in idx["wave_id"].head(25):
+        assert any(g.size == "wide" and not g.remote for g in build.build_wave(wid).gates)

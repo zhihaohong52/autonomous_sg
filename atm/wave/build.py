@@ -12,6 +12,7 @@ from pathlib import Path
 import pandas as pd
 
 from atm.wave import wind
+from atm.wave.utility import TURNAROUND_MIN, TYPICAL_TAXI_MIN
 from atm.wave.model import (Airport, Gate, Metar, Provenance, QueueArrival, Runway, Wave,
                             WaveFlight)
 
@@ -310,6 +311,10 @@ def _make_gates(wave_id: str, iata: str) -> tuple[list[Gate], bool]:
             pier = "".join(itertools_takewhile_alpha(ref)).upper() or "T"
             gates.append(Gate(ref, size, pier))
     is_real = bool(gates)
+    if gates and not any(g.size == "wide" for g in gates):
+        # the OSM table has no wide-body gate for this airport: without one every wide-body
+        # (B772, A359...) fails GND-GATE-SIZE by construction. Add two simulated wide gates.
+        gates += [Gate("W1", "wide", "W"), Gate("W2", "wide", "W")]
     if not gates:
         for pier in "AB":
             for n in range(1, 6):
@@ -381,8 +386,16 @@ def _build_flight(wave_id: str, iata: str, date: str, hour: int, r: dict, disrup
     conns = [{"flight": f"{r['carrier']}{rng.randint(100, 2999)}", "pax": rng.randint(5, 40),
               "departs_min": sched_min + rng.randint(40, 120)} for _ in range(rng.randint(0, 3))]
     prov += [Provenance("fuel", "simulated", "seeded model", f"seed={wave_id}+{cs}"),
-             Provenance("crew", "simulated", "seeded model"),
+             Provenance("crew", "simulated", "seeded model",
+                        "shift end = earliest turnaround end (ETA incl. late-aircraft/carrier delay "
+                        "+ taxi + turnaround) + 0-90 min margin: the roster already knows the inbound is late"),
              Provenance("connections", "simulated", "seeded model")]
+    # Crew shift end is anchored to the earliest achievable turnaround end, not the schedule: with
+    # multi-hour BTS late-aircraft delays a schedule-anchored shift made ~70% of flights breach
+    # GND-CREW-DUTY before any move (no move can land a flight earlier than its ETA). Airlines
+    # re-roster / reserve-crew a known-late inbound; the 0-90 min margin keeps holding, far taxi and
+    # ground delay able to cause overtime. One randint at the same position keeps later draws stable.
+    crew_end = eta_earliest + TYPICAL_TAXI_MIN + TURNAROUND_MIN + rng.randint(0, 90)
     return WaveFlight(
         callsign=cs, carrier=r["carrier"], airline=_airlines().get(r["carrier"], r["carrier"]),
         flight_no=int(r["flight_no"]), tail=tail, aircraft_type=atype, wake=wake, gate_size=size,
@@ -391,7 +404,7 @@ def _build_flight(wave_id: str, iata: str, date: str, hour: int, r: dict, disrup
         delays={"weather": float(r["weather_delay"]), "late_aircraft": late, "nas": float(r["nas_delay"]),
                 "carrier": carr, "arr_delay": float(r["arr_delay"])},
         fuel=fuel, connections=conns, scheduled_gate=gate,
-        crew_shift_end_min=sched_min + rng.randint(30, 180),
+        crew_shift_end_min=crew_end,
         next_departure_min=sched_min + rng.randint(45, 120), provenance=prov)
 
 
@@ -440,7 +453,9 @@ def build_wave(wave_id: str) -> Wave:
         Provenance("runways", "real", "OurAirports"),
         (Provenance("weather", "real", "IEM METAR", metar.raw) if metar
          else Provenance("weather", "generic", "no METAR found for window")),
-        (Provenance("gates", "real", "OpenStreetMap") if real_gates
+        (Provenance("gates", "real", "OpenStreetMap",
+                    "W1, W2 simulated wide-body gates (none in OSM data)"
+                    if any(g.id in ("W1", "W2") for g in gates) else None) if real_gates
          else Provenance("gates", "generic", "generic layout A1-A5, B1-B5")),
         Provenance("gate_occupancy", "simulated", "seeded model", f"seed={wave_id}"),
     ]

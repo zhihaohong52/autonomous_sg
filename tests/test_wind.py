@@ -35,8 +35,19 @@ def test_type_stricter(monkeypatch):
     assert "TEST" in source
 
 
-def test_vrb_worst_case():
-    assert components(None, 12, 18, 90) == (0, 18, 18)
+def test_vrb_strong_is_crosswind_not_tailwind():
+    assert components(None, 12, 18, 90) == (0, 18, 0)
+
+
+def test_vrb_light_is_calm():
+    assert components(None, 6, None, 90) == (0, 0, 0)
+    assert components(None, 5, None, 270) == (0, 0, 0)
+
+
+def test_vrb_light_with_gust_uses_gust():
+    # VRB05G15: gust above the calm threshold -> crosswind = gust, no tailwind
+    assert components(None, 5, 15, 90) == (0, 15, 0)
+    assert within_limits(15, 0, 20, 5) is True
 
 
 def test_calm_tailwind_wet_ok():

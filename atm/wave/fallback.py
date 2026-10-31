@@ -52,7 +52,7 @@ def _safety_net(wave: Wave) -> tuple[JointPlan, str]:
             a, f = plan.get(cs), wave.flight(cs)
             nv = len(viol)
             rs = next((g.id for g in wave.gates if g.remote), None)
-            gnd_fail = any(c.callsign == cs and c.rule.startswith("GND-") for c in viol)
+            gnd_fail = any(c.callsign == cs and c.rule in ("GND-GATE-FREE", "GND-GATE-SIZE") for c in viol)
             best = None
             if a.action == "land" and gnd_fail and rs is not None and a.gate != rs:
                 best = plan.with_assignment(replace(a, gate=rs, metrics=FlightMetrics()))

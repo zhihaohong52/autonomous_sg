@@ -78,7 +78,10 @@ def metrics(wave: Wave, a: Assignment) -> FlightMetrics:
     burn = hold_burn(f)
     if a.action == "divert":
         alt = max(fuel_info(f)[2] or 0.0, 0.0)
-        delay = alt + DIVERT_EXTRA_DELAY_MIN
+        # a diverting flight still carries the delay it already has (late inbound / carrier):
+        # without the base a 300-min-late flight looked *less* delayed by diverting (alt + 90)
+        base = max(0.0, f.eta_earliest_min - f.sched_min)
+        delay = base + alt + DIVERT_EXTRA_DELAY_MIN
         return FlightMetrics(hold_min=0.0, fuel_kg=round(alt * burn, 1), delay_min=round(delay, 1),
                              in_block_min=None, pax_protected=0, pax_total=pax_total,
                              overtime_min=0.0, next_dep_delay_min=round(delay, 1))

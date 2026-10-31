@@ -257,3 +257,17 @@ def test_assignment_dict_omits_none():
     d = p.to_dict()["assignments"][0]
     assert d["action"] == "divert" and not {"runway", "slot_min", "gate"} & set(d)
     assert {"runway", "slot_min", "gate"} <= set(p.to_dict()["assignments"][1])
+
+
+def test_divert_delay_includes_existing_delay():
+    """A diverting flight keeps the delay it already has (late inbound), plus alternate + 90."""
+    from dataclasses import replace as _r
+    from atm.wave.model import Assignment, FlightMetrics
+    from atm.wave.utility import DIVERT_EXTRA_DELAY_MIN, metrics
+    from tests.fixtures import make_wave
+    w = make_wave()
+    f = w.flights[0]
+    late = _r(f, eta_earliest_min=f.sched_min + 200)
+    w2 = _r(w, flights=[late] + list(w.flights[1:]))
+    m = metrics(w2, Assignment(f.callsign, "divert", None, None, None, 0.0, 0.0, FlightMetrics()))
+    assert m.delay_min == pytest.approx(200 + float(f.fuel["alternate_min"]) + DIVERT_EXTRA_DELAY_MIN)

@@ -97,6 +97,14 @@ def _known_violations(agent: str, checks, known: set[str]) -> int:
     return n
 
 
+def _known_rules(agent: str, checks, known: set[str]) -> list[str]:
+    """Sorted distinct rule ids counted by _known_violations (what the agent may be told)."""
+    role = _role(agent)
+    cs = agent.split(":", 1)[1] if role == "PILOT" else None
+    return sorted({c.rule for c in checks if not c.passed
+                   and ((c.owner == role and (cs is None or c.callsign == cs)) or c.rule in known)})
+
+
 def _maxmin(wave: Wave, plan: JointPlan) -> tuple[float, float]:
     us = [agent_utility(wave, plan, ag) for ag in agent_ids(wave)]
     return min(us), sum(us) / len(us)
@@ -332,7 +340,13 @@ def _agent_turn(run: _Run, agent: str, rnd: int, table: JointPlan, known: set[st
             if not avail:
                 stop = True
                 break
-            options = {k: f"{v[0].label} | your utility after {v[3]:.3f} (now {u_now:.3f})" for k, v in avail.items()}
+            # Same information the formula ranks on: known violations after the move (own-domain
+            # rules + every rule the engine has published), with the rule names. Informational only:
+            # the engine still vetoes every move independently.
+            options = {k: f"{v[0].label} | your utility after {v[3]:.3f} (now {u_now:.3f})"
+                          f" | known rule violations after {v[4]} (now {k_now})"
+                          + (f": {', '.join(_known_rules(agent, v[2], known))}" if v[4] else "")
+                       for k, v in avail.items()}
             has_accept = any(v[0].kind == "accept" for v in avail.values())
             if not has_accept:
                 options[PASS] = f"Make no further move | your utility stays {u_now:.3f}"
@@ -350,7 +364,10 @@ def _agent_turn(run: _Run, agent: str, rnd: int, table: JointPlan, known: set[st
                      "view": _view(w, plan, agent),
                      "utility_terms": {k: round(v, 3) for k, v in agent_terms(w, plan, agent).items()},
                      "utility_now": u_now, "reservation": run.reservation(agent, rnd),
-                     "rules_published_by_engine": sorted(known)}
+                     "rules_published_by_engine": sorted(known),
+                     "known_violations_now": k_now,
+                     "guidance": "Prefer options that reduce known rule violations; among equals, "
+                                 "higher own utility. Pass/accept if nothing improves."}
             r = dec.choice(state, f"You are {agent}. Pick ONE move for your own authority that best serves your "
                                   "objective, or pass/accept. A safety engine will veto illegal moves.",
                            options, formula)
