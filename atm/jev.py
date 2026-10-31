@@ -27,7 +27,8 @@ SEVERITY_LEVELS = [
     "Severe: heavy weather, long holding, fuel and crew limits in play, diversions possible.",
     "Critical: ground stop or airport closure conditions.",
 ]
-ACCEPT_THRESHOLD = 0.5
+ACCEPT_AT = 0.7     # P(accept) at or above: ACCEPT
+ACCEPT_BELOW = 0.3  # at or below: REJECT; in between the formula vote stands
 
 
 def available() -> bool:

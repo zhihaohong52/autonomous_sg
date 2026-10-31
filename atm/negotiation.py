@@ -245,9 +245,13 @@ def negotiate(sc: Scenario, policy: str = "rule", engine: bool = True) -> dict:
                     for it in others:
                         pa = out["p"][it["plan_id"]]
                         it["p_accept"] = round(pa, 3)
-                        it["decision"] = "ACCEPT" if pa >= jev.ACCEPT_THRESHOLD else "REJECT"
-                        it["reason"] = f"Jev P(accept)={pa:.2f}; decision-model score {it['utility']}"
-                    why = f"Jev Noul vote, accept if P >= {jev.ACCEPT_THRESHOLD} ({out['latency_s']}s)."
+                        if pa >= jev.ACCEPT_AT or pa <= jev.ACCEPT_BELOW:
+                            it["decision"] = "ACCEPT" if pa >= jev.ACCEPT_AT else "REJECT"
+                            it["reason"] = f"Jev P(accept)={pa:.2f}; decision-model score {it['utility']}"
+                        else:  # uncertain band: the formula vote already in `decision` stands
+                            it["reason"] = f"Jev P(accept)={pa:.2f} is uncertain; formula vote stands"
+                    why = (f"Jev Noul vote: accept if P >= {jev.ACCEPT_AT}, reject if P <= {jev.ACCEPT_BELOW}, "
+                           f"formula in between ({out['latency_s']}s).")
                 except Exception as e:
                     llm_errors.append(f"R{r} {a} Jev vote: {e}")
             elif policy == "llm" and others:
