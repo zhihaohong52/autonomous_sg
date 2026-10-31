@@ -11,18 +11,20 @@ from collections import Counter
 
 from atm.wave import wind
 from atm.wave.model import FlightMetrics, JointPlan, RuleCheck, Wave
-from atm.wave.utility import MAX_SPEED_REDUCTION_MIN, fuel_info, metrics, taxi_min, turnaround_min
+from atm.wave.utility import MAX_SPEED_REDUCTION_MIN, TAXI_FAR_MIN, fuel_info, metrics, taxi_min, turnaround_min
 
 SRC_WB = "challenge2_operational_constraints.xlsx"
-SRC_WAKE = f"{SRC_WB} wake_separation (min_time_s, simplified FAA JO 7110.65)"
+SRC_WAKE = f"{SRC_WB} wake_separation (min_separation_nm at 140 kt, simplified FAA JO 7110.65)"
 SRC_FUEL = f"{SRC_WB} fuel_and_crew (final reserve 30 min) + 14 CFR 121.639 alternate"
 SRC_OPS = "ops rule"
 SRC_CAP = f"{SRC_WB} airport_capacity (max_runway_ops_per_hour / active_runways)"
 SRC_TURN = f"{SRC_WB} airport_capacity (min_turnaround_min)"
 SRC_NOTICE = f"{SRC_WB} fuel_and_crew (gate change notice >= 20 min before arrival)"
+SRC_DUTY = f"{SRC_WB} fuel_and_crew (flight crew max duty 13 h from report; report = sched dep - 60 min, assumption)"
 SRC_CREW = f"{SRC_WB} fuel_and_crew (ground crew shift 8 h, overtime 1.5x)"
 GATE_NOTICE_MIN = 20.0
 OVERTIME_MULT = 1.5
+REMOTE_STAND_POSITIONS = 2   # assumption: aircraft on the remote stand (RS) at overlapping times
 SRC_RWY = "airport runway status"
 WET_VIS_SM = 3.0
 WEATHER_FACTOR_BAD = 1.25
@@ -31,9 +33,10 @@ _RWY_RE = re.compile(r"^(\d{1,2})([LRC]?)$")
 
 def wake_gap_min(leader: str, follower: str) -> float:
     """Minimum time (min) between a leader and a follower landing on the same runway (dry), from the
-    workbook wake_separation sheet (min_time_s / 60; B757 is treated as Heavy by constraints.py)."""
+    workbook wake_separation nm column converted at 140 kt (constraints.wake_s_arrival); B757 is
+    treated as Heavy by constraints.py."""
     from atm.wave import constraints
-    return constraints.wake_s(leader, follower) / 60.0
+    return constraints.wake_s_arrival(leader, follower) / 60.0
 
 
 def capacity_per_runway_h(wave: Wave) -> tuple[float, object]:
@@ -45,9 +48,9 @@ def capacity_per_runway_h(wave: Wave) -> tuple[float, object]:
 
 # --------------------------------------------------------------- limits stated (rules_of_play)
 LIMITS = [
-    {"limit": "wake separation (same runway)", "value": "Super->any 180 s, Heavy->any 120 s, Large->Small 60 s, "
-     "any other pair 60 s", "source": "workbook", "note": "workbook min_time_s (labelled departures) applied to "
-     "arrivals on the same physical runway (both ends)"},
+    {"limit": "wake separation (same runway)", "value": "3-8 nm (min_separation_nm)", "source": "workbook",
+     "note": "converted to time at 140 kt approach speed (assumption); x1.25 wet/low visibility (assumption); "
+     "applied to arrivals on the same physical runway (both ends)"},
     {"limit": "B757 wake category", "value": "Heavy", "source": "assumption",
      "note": "workbook has no B757 row; treated as Heavy (conservative)"},
     {"limit": "wet-runway / low-visibility separation factor", "value": "x1.25", "source": "assumption",
@@ -60,8 +63,12 @@ LIMITS = [
      "note": "no trip fuel in the data; holding fuel is checked against extra fuel instead"},
     {"limit": "spare fuel on arrival", "value": "45 min of holding (workbook default) unless the wave states it",
      "source": "workbook", "note": "fuel.extra_min of each flight as built by the wave builder"},
-    {"limit": "flight crew max duty", "value": "13 h from report time (not enforced)", "source": "assumption",
-     "note": "not enforced: crew report time is not in flights.csv, so no PLT-CREW-DUTY rule"},
+    {"limit": "flight crew max duty", "value": "13 h from report time", "source": "workbook",
+     "note": "report = scheduled departure - 60 min (assumption); PLT-CREW-DUTY: landing slot + taxi-in (or "
+     "alternate arrival for a diversion) must be within the duty end. A flight whose earliest possible in-block "
+     "is already past the duty end is an unavoidable duty bust (data): reported in the check detail, never a "
+     "violation. Otherwise the rule fails iff the plan's arrival is past the duty end. Skipped when the departure "
+     "time is unknown"},
     {"limit": "ground crew shift / overtime", "value": "8 h shift, overtime cost x1.5", "source": "workbook",
      "note": "overtime is allowed (GND-CREW-DUTY reports it, never vetoes) and costs 1.5x in Ground utility; "
      "changed from v1 where any overtime was illegal"},
@@ -75,8 +82,8 @@ LIMITS = [
     {"limit": "runways and wind", "value": "real runway ids, headings and METAR", "source": "real data",
      "note": "real runways are used instead of the workbook active_runways count, which is only the divisor "
      "of the capacity cap; crosswind/tailwind limits from FAA Order 8400.9 / AFM"},
-    {"limit": "remote stand", "value": "1 stand, unlimited positions", "source": "assumption",
-     "note": "exempt from gate notice; costs taxi time"},
+    {"limit": "remote stand", "value": "1 stand, 2 positions", "source": "assumption",
+     "note": "not in workbook; spare_gates from workbook remain binding; exempt from gate notice"},
     {"limit": "speed reduction cap", "value": f"{MAX_SPEED_REDUCTION_MIN:g} min", "source": "assumption",
      "note": "maximum en-route speed reduction a pilot may use to absorb delay"},
     {"limit": "turnaround / gate occupancy", "value": "airport min_turnaround_min", "source": "workbook",
@@ -244,8 +251,23 @@ def _gate_free_checks(wave: Wave, plan: JointPlan, mm: dict[str, FlightMetrics])
         end = ib + turn
         ev = {"gate": g.id, "need_from_min": ib, "need_to_min": round(end, 1), "turnaround_min": turn}
         if g.remote:
-            out[a.callsign] = RuleCheck("GND-GATE-FREE", "GROUND", True,
-                                        f"Remote stand {g.id} has unlimited positions", SRC_OPS, ev, a.callsign)
+            # RS has REMOTE_STAND_POSITIONS positions: same overlap test as a gate, and only the later
+            # arrival of an over-subscribed set fails
+            earlier = []
+            for o in landing:
+                if o is a or o.gate != g.id:
+                    continue
+                oib = mm[o.callsign].in_block_min
+                if oib is not None and math.isfinite(oib) and oib < end and ib < oib + turn and \
+                        (oib, o.callsign) < (ib, a.callsign):
+                    earlier.append(o.callsign)
+            ok = len(earlier) < REMOTE_STAND_POSITIONS
+            ev.update({"positions": REMOTE_STAND_POSITIONS, "overlapping": ", ".join(earlier) or "none"})
+            out[a.callsign] = RuleCheck(
+                "GND-GATE-FREE", "GROUND", ok,
+                f"Remote stand {g.id} ({REMOTE_STAND_POSITIONS} positions) "
+                + (f"free for {a.callsign} T{ib:+g}..T{end:+g}" if ok else
+                   f"full T{ib:+g}..T{end:+g}: {', '.join(earlier)} already on it"), SRC_OPS, ev, a.callsign)
             continue
         clash = None
         for b in g.busy:
@@ -320,6 +342,42 @@ def _divert_check(f, cs: str) -> RuleCheck:
                      SRC_FUEL, ev, cs)
 
 
+def _duty_check(f, a, mm, cs: str) -> RuleCheck | None:
+    """PLT-CREW-DUTY: in-block (landing slot + taxi-in) or alternate arrival within the flight crew duty end.
+    Fails iff the plan's arrival exceeds the duty end AND eta_earliest + taxi was still within it (the plan
+    caused the bust). If even the earliest landing busts the duty it is an unavoidable bust in the data:
+    reported, never a violation. None when the duty end is unknown."""
+    end = getattr(f, "crew_duty_end_min", None)
+    if end is None:
+        return None
+    if a.action == "divert":
+        _, alt, alt_min, _ = fuel_info(f)
+        arr = f.eta_earliest_min + float(alt_min or 0.0)
+        taxi = TAXI_FAR_MIN
+        what = f"diverts, alternate {alt or '?'} arrival T{arr:+g}"
+    else:
+        arr = mm[cs].in_block_min
+        if arr is None or not math.isfinite(arr) or not has_slot(a):
+            return RuleCheck("PLT-CREW-DUTY", "PILOT", False, f"{cs}: no in-block time to check crew duty",
+                             SRC_DUTY, {"crew_duty_end_min": end}, cs)
+        taxi = arr - float(a.slot_min)
+        what = f"in-block T{arr:+g}"
+    earliest = f.eta_earliest_min + taxi
+    unavoidable = earliest > end + 1e-9
+    ok = arr <= end + 1e-9 or unavoidable
+    if arr <= end + 1e-9:
+        tail = f"<= crew duty end T{end:+g}"
+    elif unavoidable:
+        tail = (f"> crew duty end T{end:+g}: unavoidable duty bust (data), earliest landing in-block "
+                f"T{earliest:+g} is already past it")
+    else:
+        tail = f"> crew duty end T{end:+g} (earliest possible in-block T{earliest:+g} would fit)"
+    return RuleCheck("PLT-CREW-DUTY", "PILOT", ok, f"{cs}: {what} {tail}", SRC_DUTY,
+                     {"arrival_min": round(arr, 1), "crew_duty_end_min": round(end, 1),
+                      "earliest_arrival_min": round(earliest, 1),
+                      "unavoidable_bust": "yes" if unavoidable else "no"}, cs)
+
+
 def check(wave: Wave, plan: JointPlan, mm: dict[str, FlightMetrics] | None = None) -> list[RuleCheck]:
     """All rules for all flights. Raises ValueError if the plan does not have exactly one
     assignment per wave flight."""
@@ -341,6 +399,9 @@ def check(wave: Wave, plan: JointPlan, mm: dict[str, FlightMetrics] | None = Non
         cs = a.callsign
         if a.action == "divert":
             out.append(_divert_check(f, cs))
+            d = _duty_check(f, a, mm, cs)
+            if d:
+                out.append(d)
             continue
 
         # ATC-RWY-OPEN (exists, open, not used against the flow on the same strip)
@@ -436,6 +497,11 @@ def check(wave: Wave, plan: JointPlan, mm: dict[str, FlightMetrics] | None = Non
             f"({alt or 'none'}) + {fin:g} min final reserve", SRC_FUEL,
             {"hold_min": round(hold, 2) if slot_ok else "unknown", "extra_min": extra,
              "alternate": str(alt or "none"), "final_reserve_min": fin}, cs))
+
+        # PLT-CREW-DUTY
+        d = _duty_check(f, a, mm, cs)
+        if d:
+            out.append(d)
 
         # GND-GATE-SIZE
         if g is None:

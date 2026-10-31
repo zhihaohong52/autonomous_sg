@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from atm.wave import wind
+from atm.wave import constraints, wind
 from atm.wave.utility import TURNAROUND_MIN, TYPICAL_TAXI_MIN
 from atm.wave.model import (Airport, Gate, Metar, Provenance, QueueArrival, Runway, Wave,
                             WaveFlight)
@@ -391,10 +391,12 @@ def _build_flight(wave_id: str, iata: str, date: str, hour: int, r: dict, disrup
     arr_abs = _hhmm_min(r["sched_arr"])
     dep_hhmm = _num(r.get("sched_dep"))
     airborne = False
+    duty_end = None   # flight crew duty end (13 h from sched dep - 60 min); None when sched_dep is unknown
     if dep_hhmm is not None:
         dep_abs = _hhmm_min(dep_hhmm)
         dep_min = dep_abs - hour * 60 - (1440 if dep_abs > arr_abs else 0)
         airborne = dep_min < -30
+        duty_end = dep_min - 60 + constraints.RULES["crew_duty_h"] * 60
 
     # gate: seeded pick of a size-compatible, preferably free and unused gate
     cands = [g for g in gates if not g.remote and g.size == size] or [g for g in gates if not g.remote]
@@ -428,7 +430,7 @@ def _build_flight(wave_id: str, iata: str, date: str, hour: int, r: dict, disrup
                 "carrier": carr, "arr_delay": float(r["arr_delay"])},
         fuel=fuel, connections=conns, scheduled_gate=gate,
         crew_shift_end_min=crew_end,
-        next_departure_min=sched_min + rng.randint(45, 120), provenance=prov)
+        next_departure_min=sched_min + rng.randint(45, 120), provenance=prov, crew_duty_end_min=duty_end)
 
 
 def _queue(w: pd.DataFrame, runways: list[Runway], rwinds: list) -> list[QueueArrival]:

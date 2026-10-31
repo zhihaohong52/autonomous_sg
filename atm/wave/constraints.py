@@ -95,6 +95,15 @@ def wake_nm(leader: str, follower: str) -> float:
     return _load()[1].get((_cat(leader), _cat(follower)), _OTHER)[0]
 
 
+APPROACH_KT = 140.0   # assumption: converts the workbook nm separations into arrival time gaps
+
+
+def wake_s_arrival(leader_cat: str, follower_cat: str) -> int:
+    """Arrival separation in seconds = workbook min_separation_nm / 140 kt * 3600 (3 nm -> 77 s, 4 -> 103,
+    5 -> 129, 6 -> 154, 7 -> 180, 8 -> 206; any other pair 3 nm). Same category handling as wake_s."""
+    return int(round(wake_nm(leader_cat, follower_cat) / APPROACH_KT * 3600))
+
+
 def wake_s(leader_cat: str, follower_cat: str) -> int:
     """Minimum time separation in seconds (workbook `min_time_s`). Accepts model Wake strings
     (SUPER/HEAVY/B757/LARGE/SMALL) or workbook names (Super/Heavy/Large/Small)."""

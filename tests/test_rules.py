@@ -22,12 +22,12 @@ def _plan(w, **over):
 
 def test_wake_violation_detected():
     w = make_wave(queue=[])
-    # DL100 (HEAVY) at T+5, DL201 (LARGE) 1 min behind on the same runway: need 3 min
+    # DL100 (HEAVY) at T+5, DL201 (LARGE) 1 min behind on the same runway: need 2.15 min
     p = _plan(w, DL100=dict(runway="27L", slot_min=5.0), DL201=dict(runway="27L", slot_min=6.0),
               AA302=dict(runway="26R", slot_min=8.0), UA403=dict(runway="26R", slot_min=12.0))
     c = _by(rules.check(w, p), "ATC-WAKE-SEP", "DL201")
     assert not c.passed
-    assert c.evidence["leader"] == "DL100" and c.evidence["required_behind_min"] == 2.0  # workbook Heavy->Large 120 s
+    assert c.evidence["leader"] == "DL100" and c.evidence["required_behind_min"] == 2.15  # Heavy->Large 5 nm = 129 s
     assert c.source.startswith("challenge2_operational_constraints.xlsx")
     assert _by(rules.check(w, p), "ATC-WAKE-SEP", "DL100").passed
     assert not rules.feasible(w, p)
@@ -38,6 +38,26 @@ def test_wake_violation_against_queue_follower():
     p = _plan(w, AA302=dict(runway="26R", slot_min=9.5))
     c = _by(rules.check(w, p), "ATC-WAKE-SEP", "AA302")
     assert not c.passed and c.evidence["follower"] == "F99"
+
+
+def test_wake_s_arrival_values():
+    from atm.wave import constraints
+    assert constraints.wake_s_arrival("Heavy", "Large") == 129     # 5 nm at 140 kt
+    assert constraints.wake_s_arrival("Large", "Large") == 77      # other pair 3 nm
+    assert constraints.wake_s_arrival("Super", "Small") == 206     # 8 nm
+    assert constraints.wake_s_arrival("SUPER", "HEAVY") == 154     # model strings, 6 nm
+
+
+def test_same_runway_pair_closer_than_arrival_spacing_fails():
+    w = make_wave(queue=[])
+    # DL201 and AA302 both LARGE on 27L: 3 nm = 77 s = 1.28 min. 1.2 min behind fails, 1.3 min passes
+    base = dict(DL100=dict(runway="26R", slot_min=5.0), UA403=dict(runway="26R", slot_min=12.0),
+                DL201=dict(runway="27L", slot_min=6.0))
+    p = _plan(w, **base, AA302=dict(runway="27L", slot_min=7.2))
+    c = _by(rules.check(w, p), "ATC-WAKE-SEP", "AA302")
+    assert not c.passed and c.evidence["required_behind_min"] == 1.28
+    p = _plan(w, **base, AA302=dict(runway="27L", slot_min=7.3))
+    assert _by(rules.check(w, p), "ATC-WAKE-SEP", "AA302").passed
 
 
 def test_wet_weather_factor():
@@ -60,11 +80,30 @@ def test_gate_overlap_detected():
     p2 = p2.with_assignment(replace(p2.get("UA403"), gate="B2"))
     c = _by(rules.check(w, p2), "GND-GATE-FREE", "UA403")
     assert not c.passed and "DL55" in c.detail
-    # remote stand never conflicts
+    # remote stand has 2 positions: two overlapping aircraft are fine
     p3 = fcfs_plan(w)
     for cs in ("DL201", "AA302"):
         p3 = p3.with_assignment(replace(p3.get(cs), gate="RS"))
     assert all(_by(rules.check(w, p3), "GND-GATE-FREE", cs).passed for cs in ("DL201", "AA302"))
+
+
+def test_remote_stand_two_positions():
+    w = make_wave()
+    # all four fixture flights are in block within one 45 min turnaround of each other
+    p = fcfs_plan(w)
+    for cs in ("DL100", "DL201", "AA302"):
+        p = p.with_assignment(replace(p.get(cs), gate="RS"))
+    c = _by(rules.check(w, p), "GND-GATE-FREE", "AA302")   # latest in-block of the three
+    assert not c.passed and "full" in c.detail and "DL100" in c.detail and "DL201" in c.detail
+    assert _by(rules.check(w, p), "GND-GATE-FREE", "DL100").passed
+    assert _by(rules.check(w, p), "GND-GATE-FREE", "DL201").passed
+    assert not rules.feasible(w, p)
+    # two on RS: both pass
+    p2 = fcfs_plan(w)
+    for cs in ("DL100", "DL201"):
+        p2 = p2.with_assignment(replace(p2.get(cs), gate="RS"))
+    assert _by(rules.check(w, p2), "GND-GATE-FREE", "DL100").passed
+    assert _by(rules.check(w, p2), "GND-GATE-FREE", "DL201").passed
 
 
 def test_gate_size():
@@ -180,7 +219,7 @@ def test_opposite_ends_rejected():
     cs = rules.check(w2, p2)
     assert not _by(cs, "ATC-RWY-OPEN", "DL100").passed
     wk = _by(cs, "ATC-WAKE-SEP", "DL100")
-    assert not wk.passed and wk.evidence["leader"] == "Q1" and wk.evidence["required_behind_min"] == 3.0
+    assert not wk.passed and wk.evidence["leader"] == "Q1" and wk.evidence["required_behind_min"] == 2.57  # Super->Heavy 6 nm = 154 s
 
 
 def test_divert_needs_alternate():
@@ -278,6 +317,6 @@ def test_divert_delay_includes_existing_delay():
 def test_limits_entries_present():
     from atm.wave import rules
     names = {l["limit"]: l for l in rules.LIMITS}
-    assert names["remote stand"]["value"] == "1 stand, unlimited positions"
+    assert names["remote stand"]["value"] == "1 stand, 2 positions"
     assert "speed reduction cap" in names
     assert "departures not modelled" in names["runway capacity"]["note"]

@@ -324,7 +324,8 @@ def _flight(row_id: int, iata: str, date: str, hour: int, r: dict, disrupted: bo
         delays={"weather": float(r["weather_delay"]), "late_aircraft": late, "nas": float(r["nas_delay"]),
                 "carrier": carr, "arr_delay": float(r["arr_delay"])},
         fuel=fuel, connections=conns, scheduled_gate=gate, crew_shift_end_min=crew_end,
-        next_departure_min=sched_min + turn + rng.randint(0, 75), provenance=prov)
+        next_departure_min=sched_min + turn + rng.randint(0, 75), provenance=prov,
+        crew_duty_end_min=duty_end)
 
 
 # ---------------------------------------------------------------- public API

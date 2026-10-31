@@ -113,6 +113,7 @@ class WaveFlight(_Dict):
     crew_shift_end_min: float
     next_departure_min: float
     provenance: list[Provenance] = field(default_factory=list)
+    crew_duty_end_min: float | None = None   # flight crew 13 h duty end (T0-relative); omitted from JSON when None
 
 
 @dataclass
@@ -134,6 +135,9 @@ class Wave(_Dict):
         d = asdict(self)
         if d["focus"] is None:
             del d["focus"]
+        for f in d["flights"]:
+            if f.get("crew_duty_end_min") is None:
+                f.pop("crew_duty_end_min", None)
         return d
 
     def flight(self, callsign: str) -> WaveFlight:

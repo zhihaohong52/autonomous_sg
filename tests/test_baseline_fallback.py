@@ -64,8 +64,9 @@ def test_all_gates_busy_uses_remote_stand():
     w = _gates_busy()
     plan, _ = solve(w)
     assert rules.feasible(w, plan)
-    assert all(a.action == "land" for a in plan.assignments)
-    assert any(a.gate == "RS" for a in plan.assignments)
+    # RS holds 2 aircraft: the rest go to the next escape (ground delay / divert), never past the cap
+    on_rs = [a for a in plan.assignments if a.action == "land" and a.gate == "RS"]
+    assert 1 <= len(on_rs) <= rules.REMOTE_STAND_POSITIONS
 
 
 def test_bad_gate_never_raises():
