@@ -77,7 +77,7 @@ def _vote(plan: JointPlan, who: str, accept: bool = True, util: float = 0.7, res
             "reason": f"{who} utility {util} {'>=' if accept else '<'} reservation {res} (stub)"}
 
 
-def negotiate_wave(wave: Wave, mode: str, chain: list[str] | None = None, on_message=None) -> dict:
+def negotiate_wave(wave: Wave, mode: str, chain: list[str] | None = None, on_message=None, narrate: bool = False) -> dict:
     t0 = time.time()
     chain = chain or ["formula"]
     model = chain[0]
