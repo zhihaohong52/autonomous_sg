@@ -255,3 +255,13 @@ td .sub { display: block; font-size: var(--fs-small); color: var(--muted); line-
 .gantt .lane-label { font-size: 13px; }
 .gantt .bar-label, .gantt .q-label { font-size: 12px; }
 td .sub { font-size: 13px; }
+/* airport map beside the wind table */
+.map-row { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 32px; align-items: start; }
+.tabpanel > .map-row + section { margin-top: 28px; }
+.airport-map { display: block; max-width: 620px; }
+.airport-map .end-label { font: 500 12px var(--mono); fill: var(--soft); }
+.airport-map .end-label.used { fill: var(--hue); }
+.airport-map .end-label.closed { fill: var(--muted); text-decoration: line-through; }
+.airport-map .rose { font: 12px var(--font); fill: var(--muted); }
+.airport-map .rose-value { font: 500 15px var(--font); fill: var(--text); }
+@media (max-width: 1100px) { .map-row { grid-template-columns: 1fr; } }
