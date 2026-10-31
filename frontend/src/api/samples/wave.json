@@ -382,7 +382,7 @@
       "origin": "DBQ",
       "sched_arr": "2015-08-19T07:30:00",
       "sched_min": -30.0,
-      "eta_earliest_min": -30.0,
+      "eta_earliest_min": 301.0,
       "airborne": true,
       "disrupted": false,
       "delays": {
@@ -411,7 +411,7 @@
         }
       ],
       "scheduled_gate": "B18",
-      "crew_shift_end_min": 133.8391463034689,
+      "crew_shift_end_min": 352.0,
       "next_departure_min": 47.0,
       "provenance": [
         {
@@ -458,7 +458,7 @@
       "origin": "XNA",
       "sched_arr": "2015-08-19T07:49:00",
       "sched_min": -11.0,
-      "eta_earliest_min": -11.0,
+      "eta_earliest_min": 29.0,
       "airborne": true,
       "disrupted": false,
       "delays": {
@@ -534,7 +534,7 @@
       "origin": "ATL",
       "sched_arr": "2015-08-19T08:05:00",
       "sched_min": 5.0,
-      "eta_earliest_min": 5.0,
+      "eta_earliest_min": 62.0,
       "airborne": true,
       "disrupted": true,
       "delays": {
@@ -558,7 +558,7 @@
         }
       ],
       "scheduled_gate": "B18",
-      "crew_shift_end_min": 82.47680658293643,
+      "crew_shift_end_min": 113.0,
       "next_departure_min": 114.0,
       "provenance": [
         {
@@ -605,7 +605,7 @@
       "origin": "DFW",
       "sched_arr": "2015-08-19T08:26:00",
       "sched_min": 26.0,
-      "eta_earliest_min": 26.0,
+      "eta_earliest_min": 106.0,
       "airborne": true,
       "disrupted": false,
       "delays": {
