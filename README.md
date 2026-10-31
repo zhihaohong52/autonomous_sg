@@ -4,8 +4,6 @@ Design: `docs/superpowers/specs/2026-10-31-disruption-negotiator-design.md` · A
 
 **Live demo:** https://disruption-negotiator.onrender.com · **Deck (36 s):** [`deck/final-approach-deck.mp4`](deck/final-approach-deck.mp4)
 
-<video src="https://github.com/zhihaohong52/final_approach/raw/main/deck/final-approach-deck.mp4" controls muted width="100%"></video>
-
 [![Final Approach deck: click to play](deck/poster.png)](deck/final-approach-deck.mp4)
 
 ## 1. Pitch
