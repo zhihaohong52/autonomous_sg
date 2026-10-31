@@ -1,5 +1,5 @@
 {
-  "run_id": "d560fa3de642",
+  "run_id": "6dc98cea73a1",
   "wave_id": "F2015-270287",
   "mode": "decision",
   "model": "typesafe/jev-1.14",
@@ -31,9 +31,9 @@
   "limits": [
     {
       "limit": "wake separation (same runway)",
-      "value": "Super->any 180 s, Heavy->any 120 s, Large->Small 60 s, any other pair 60 s",
+      "value": "3-8 nm (min_separation_nm)",
       "source": "workbook",
-      "note": "workbook min_time_s (labelled departures) applied to arrivals on the same physical runway (both ends)"
+      "note": "converted to time at 140 kt approach speed (assumption); x1.25 wet/low visibility (assumption); applied to arrivals on the same physical runway (both ends)"
     },
     {
       "limit": "B757 wake category",
@@ -73,9 +73,9 @@
     },
     {
       "limit": "flight crew max duty",
-      "value": "13 h from report time (not enforced)",
-      "source": "assumption",
-      "note": "not enforced: crew report time is not in flights.csv, so no PLT-CREW-DUTY rule"
+      "value": "13 h from report time",
+      "source": "workbook",
+      "note": "report = scheduled departure - 60 min (assumption); PLT-CREW-DUTY: landing slot + taxi-in (or alternate arrival for a diversion) must be within the duty end. A flight whose earliest possible in-block is already past the duty end is an unavoidable duty bust (data): reported in the check detail, never a violation. Otherwise the rule fails iff the plan's arrival is past the duty end. Skipped when the departure time is unknown"
     },
     {
       "limit": "ground crew shift / overtime",
@@ -103,9 +103,9 @@
     },
     {
       "limit": "remote stand",
-      "value": "1 stand, unlimited positions",
+      "value": "1 stand, 2 positions",
       "source": "assumption",
-      "note": "exempt from gate notice; costs taxi time"
+      "note": "not in workbook; spare_gates from workbook remain binding; exempt from gate notice"
     },
     {
       "limit": "speed reduction cap",
@@ -230,7 +230,7 @@
         "owner": "ATC",
         "passed": true,
         "detail": "MQ3327 on 09C (strip 09C/27C) at T+301: wake separation met (weather factor x1)",
-        "source": "challenge2_operational_constraints.xlsx wake_separation (min_time_s, simplified FAA JO 7110.65)",
+        "source": "challenge2_operational_constraints.xlsx wake_separation (min_separation_nm at 140 kt, simplified FAA JO 7110.65)",
         "evidence": {
           "runway": "09C",
           "strip": "09C/27C",
@@ -241,7 +241,7 @@
           "leader_wake": "LARGE",
           "leader_runway": "09C",
           "gap_behind_min": 272.0,
-          "required_behind_min": 1.0
+          "required_behind_min": 1.28
         },
         "callsign": "MQ3327"
       },
@@ -303,6 +303,20 @@
           "extra_min": 45.0,
           "alternate": "MDW",
           "final_reserve_min": 30.0
+        },
+        "callsign": "MQ3327"
+      },
+      {
+        "rule": "PLT-CREW-DUTY",
+        "owner": "PILOT",
+        "passed": true,
+        "detail": "MQ3327: in-block T+307 <= crew duty end T+630",
+        "source": "challenge2_operational_constraints.xlsx fuel_and_crew (flight crew max duty 13 h from report; report = sched dep - 60 min, assumption)",
+        "evidence": {
+          "arrival_min": 307.0,
+          "crew_duty_end_min": 630,
+          "earliest_arrival_min": 307.0,
+          "unavoidable_bust": "no"
         },
         "callsign": "MQ3327"
       },
@@ -396,7 +410,7 @@
         "owner": "ATC",
         "passed": true,
         "detail": "MQ3318 on 09C (strip 09C/27C) at T+29: wake separation met (weather factor x1)",
-        "source": "challenge2_operational_constraints.xlsx wake_separation (min_time_s, simplified FAA JO 7110.65)",
+        "source": "challenge2_operational_constraints.xlsx wake_separation (min_separation_nm at 140 kt, simplified FAA JO 7110.65)",
         "evidence": {
           "runway": "09C",
           "strip": "09C/27C",
@@ -464,6 +478,20 @@
           "extra_min": 45.0,
           "alternate": "MDW",
           "final_reserve_min": 30.0
+        },
+        "callsign": "MQ3318"
+      },
+      {
+        "rule": "PLT-CREW-DUTY",
+        "owner": "PILOT",
+        "passed": true,
+        "detail": "MQ3318: in-block T+35 <= crew duty end T+600",
+        "source": "challenge2_operational_constraints.xlsx fuel_and_crew (flight crew max duty 13 h from report; report = sched dep - 60 min, assumption)",
+        "evidence": {
+          "arrival_min": 35.0,
+          "crew_duty_end_min": 600,
+          "earliest_arrival_min": 35.0,
+          "unavoidable_bust": "no"
         },
         "callsign": "MQ3318"
       },
@@ -557,7 +585,7 @@
         "owner": "ATC",
         "passed": true,
         "detail": "OO5559 on 09L (strip 09L/27R) at T+62: wake separation met (weather factor x1)",
-        "source": "challenge2_operational_constraints.xlsx wake_separation (min_time_s, simplified FAA JO 7110.65)",
+        "source": "challenge2_operational_constraints.xlsx wake_separation (min_separation_nm at 140 kt, simplified FAA JO 7110.65)",
         "evidence": {
           "runway": "09L",
           "strip": "09L/27R",
@@ -625,6 +653,20 @@
           "extra_min": 45.0,
           "alternate": "MDW",
           "final_reserve_min": 30.0
+        },
+        "callsign": "OO5559"
+      },
+      {
+        "rule": "PLT-CREW-DUTY",
+        "owner": "PILOT",
+        "passed": true,
+        "detail": "OO5559: in-block T+68 <= crew duty end T+660",
+        "source": "challenge2_operational_constraints.xlsx fuel_and_crew (flight crew max duty 13 h from report; report = sched dep - 60 min, assumption)",
+        "evidence": {
+          "arrival_min": 68.0,
+          "crew_duty_end_min": 660,
+          "earliest_arrival_min": 68.0,
+          "unavoidable_bust": "no"
         },
         "callsign": "OO5559"
       },
@@ -718,7 +760,7 @@
         "owner": "ATC",
         "passed": true,
         "detail": "OO5570 on 22R (strip 04L/22R) at T+106: wake separation met (weather factor x1)",
-        "source": "challenge2_operational_constraints.xlsx wake_separation (min_time_s, simplified FAA JO 7110.65)",
+        "source": "challenge2_operational_constraints.xlsx wake_separation (min_separation_nm at 140 kt, simplified FAA JO 7110.65)",
         "evidence": {
           "runway": "22R",
           "strip": "04L/22R",
@@ -729,7 +771,7 @@
           "leader_wake": "LARGE",
           "leader_runway": "22R",
           "gap_behind_min": 149.0,
-          "required_behind_min": 1.0
+          "required_behind_min": 1.28
         },
         "callsign": "OO5570"
       },
@@ -791,6 +833,20 @@
           "extra_min": 45.0,
           "alternate": "MDW",
           "final_reserve_min": 30.0
+        },
+        "callsign": "OO5570"
+      },
+      {
+        "rule": "PLT-CREW-DUTY",
+        "owner": "PILOT",
+        "passed": true,
+        "detail": "OO5570: in-block T+116 <= crew duty end T+600",
+        "source": "challenge2_operational_constraints.xlsx fuel_and_crew (flight crew max duty 13 h from report; report = sched dep - 60 min, assumption)",
+        "evidence": {
+          "arrival_min": 116.0,
+          "crew_duty_end_min": 600,
+          "earliest_arrival_min": 116.0,
+          "unavoidable_bust": "no"
         },
         "callsign": "OO5570"
       },
@@ -986,7 +1042,7 @@
           "owner": "ATC",
           "passed": true,
           "detail": "MQ3327 on 22R (strip 04L/22R) at T+301: wake separation met (weather factor x1)",
-          "source": "challenge2_operational_constraints.xlsx wake_separation (min_time_s, simplified FAA JO 7110.65)",
+          "source": "challenge2_operational_constraints.xlsx wake_separation (min_separation_nm at 140 kt, simplified FAA JO 7110.65)",
           "evidence": {
             "runway": "22R",
             "strip": "04L/22R",
@@ -997,7 +1053,7 @@
             "leader_wake": "LARGE",
             "leader_runway": "22R",
             "gap_behind_min": 195.0,
-            "required_behind_min": 1.0
+            "required_behind_min": 1.28
           },
           "callsign": "MQ3327"
         },
@@ -1059,6 +1115,20 @@
             "extra_min": 45.0,
             "alternate": "MDW",
             "final_reserve_min": 30.0
+          },
+          "callsign": "MQ3327"
+        },
+        {
+          "rule": "PLT-CREW-DUTY",
+          "owner": "PILOT",
+          "passed": true,
+          "detail": "MQ3327: in-block T+311 <= crew duty end T+630",
+          "source": "challenge2_operational_constraints.xlsx fuel_and_crew (flight crew max duty 13 h from report; report = sched dep - 60 min, assumption)",
+          "evidence": {
+            "arrival_min": 311.0,
+            "crew_duty_end_min": 630,
+            "earliest_arrival_min": 311.0,
+            "unavoidable_bust": "no"
           },
           "callsign": "MQ3327"
         },
@@ -1152,7 +1222,7 @@
           "owner": "ATC",
           "passed": true,
           "detail": "MQ3318 on 22R (strip 04L/22R) at T+29: wake separation met (weather factor x1)",
-          "source": "challenge2_operational_constraints.xlsx wake_separation (min_time_s, simplified FAA JO 7110.65)",
+          "source": "challenge2_operational_constraints.xlsx wake_separation (min_separation_nm at 140 kt, simplified FAA JO 7110.65)",
           "evidence": {
             "runway": "22R",
             "strip": "04L/22R",
@@ -1163,7 +1233,7 @@
             "leader_wake": "LARGE",
             "leader_runway": "22R",
             "gap_behind_min": 72.0,
-            "required_behind_min": 1.0
+            "required_behind_min": 1.28
           },
           "callsign": "MQ3318"
         },
@@ -1225,6 +1295,20 @@
             "extra_min": 45.0,
             "alternate": "MDW",
             "final_reserve_min": 30.0
+          },
+          "callsign": "MQ3318"
+        },
+        {
+          "rule": "PLT-CREW-DUTY",
+          "owner": "PILOT",
+          "passed": true,
+          "detail": "MQ3318: in-block T+39 <= crew duty end T+600",
+          "source": "challenge2_operational_constraints.xlsx fuel_and_crew (flight crew max duty 13 h from report; report = sched dep - 60 min, assumption)",
+          "evidence": {
+            "arrival_min": 39.0,
+            "crew_duty_end_min": 600,
+            "earliest_arrival_min": 39.0,
+            "unavoidable_bust": "no"
           },
           "callsign": "MQ3318"
         },
@@ -1318,7 +1402,7 @@
           "owner": "ATC",
           "passed": true,
           "detail": "OO5559 on 22R (strip 04L/22R) at T+62: wake separation met (weather factor x1)",
-          "source": "challenge2_operational_constraints.xlsx wake_separation (min_time_s, simplified FAA JO 7110.65)",
+          "source": "challenge2_operational_constraints.xlsx wake_separation (min_separation_nm at 140 kt, simplified FAA JO 7110.65)",
           "evidence": {
             "runway": "22R",
             "strip": "04L/22R",
@@ -1329,7 +1413,7 @@
             "leader_wake": "LARGE",
             "leader_runway": "22R",
             "gap_behind_min": 33.0,
-            "required_behind_min": 1.0
+            "required_behind_min": 1.28
           },
           "callsign": "OO5559"
         },
@@ -1391,6 +1475,20 @@
             "extra_min": 45.0,
             "alternate": "MDW",
             "final_reserve_min": 30.0
+          },
+          "callsign": "OO5559"
+        },
+        {
+          "rule": "PLT-CREW-DUTY",
+          "owner": "PILOT",
+          "passed": true,
+          "detail": "OO5559: in-block T+72 <= crew duty end T+660",
+          "source": "challenge2_operational_constraints.xlsx fuel_and_crew (flight crew max duty 13 h from report; report = sched dep - 60 min, assumption)",
+          "evidence": {
+            "arrival_min": 72.0,
+            "crew_duty_end_min": 660,
+            "earliest_arrival_min": 72.0,
+            "unavoidable_bust": "no"
           },
           "callsign": "OO5559"
         },
@@ -1484,7 +1582,7 @@
           "owner": "ATC",
           "passed": true,
           "detail": "OO5570 on 22R (strip 04L/22R) at T+106: wake separation met (weather factor x1)",
-          "source": "challenge2_operational_constraints.xlsx wake_separation (min_time_s, simplified FAA JO 7110.65)",
+          "source": "challenge2_operational_constraints.xlsx wake_separation (min_separation_nm at 140 kt, simplified FAA JO 7110.65)",
           "evidence": {
             "runway": "22R",
             "strip": "04L/22R",
@@ -1495,7 +1593,7 @@
             "leader_wake": "LARGE",
             "leader_runway": "22R",
             "gap_behind_min": 44.0,
-            "required_behind_min": 1.0
+            "required_behind_min": 1.28
           },
           "callsign": "OO5570"
         },
@@ -1557,6 +1655,20 @@
             "extra_min": 45.0,
             "alternate": "MDW",
             "final_reserve_min": 30.0
+          },
+          "callsign": "OO5570"
+        },
+        {
+          "rule": "PLT-CREW-DUTY",
+          "owner": "PILOT",
+          "passed": true,
+          "detail": "OO5570: in-block T+116 <= crew duty end T+600",
+          "source": "challenge2_operational_constraints.xlsx fuel_and_crew (flight crew max duty 13 h from report; report = sched dep - 60 min, assumption)",
+          "evidence": {
+            "arrival_min": 116.0,
+            "crew_duty_end_min": 600,
+            "earliest_arrival_min": 116.0,
+            "unavoidable_bust": "no"
           },
           "callsign": "OO5570"
         },
@@ -1653,13 +1765,13 @@
   "stats": {
     "model_calls": 9,
     "fallbacks": 0,
-    "elapsed_ms": 4361
+    "elapsed_ms": 4304
   },
   "log": [
     {
       "seq": 0,
       "round": 0,
-      "ts": "2026-10-31T05:55:14.791032+00:00",
+      "ts": "2026-10-31T06:15:26.571689+00:00",
       "sender": "DECIDER",
       "type": "TRIAGE",
       "body": {
@@ -1675,32 +1787,32 @@
         "probabilities": [
           0.03,
           0.08,
-          0.13,
-          0.7,
-          0.06
+          0.15,
+          0.67,
+          0.07
         ],
-        "confidence": 0.63
+        "confidence": 0.61
       },
       "rationale": "Severity 3/4 (worst delay 331 min, 14/14 runways within wind limits); up to 3 moves per agent per turn",
       "decision": {
         "kind": "score",
         "model": "typesafe/jev-1.14-20261014",
         "provider": "openrouter",
-        "latency_ms": 434,
+        "latency_ms": 446,
         "probabilities": {
           "0": 0.03,
           "1": 0.08,
-          "2": 0.13,
-          "3": 0.7,
-          "4": 0.06
+          "2": 0.15,
+          "3": 0.67,
+          "4": 0.07
         },
-        "confidence": 0.63
+        "confidence": 0.61
       }
     },
     {
       "seq": 1,
       "round": 0,
-      "ts": "2026-10-31T05:55:14.792732+00:00",
+      "ts": "2026-10-31T06:15:26.573528+00:00",
       "sender": "ENGINE",
       "type": "OPEN",
       "body": {
@@ -1809,7 +1921,7 @@
               "owner": "ATC",
               "passed": true,
               "detail": "MQ3327 on 22R (strip 04L/22R) at T+301: wake separation met (weather factor x1)",
-              "source": "challenge2_operational_constraints.xlsx wake_separation (min_time_s, simplified FAA JO 7110.65)",
+              "source": "challenge2_operational_constraints.xlsx wake_separation (min_separation_nm at 140 kt, simplified FAA JO 7110.65)",
               "evidence": {
                 "runway": "22R",
                 "strip": "04L/22R",
@@ -1820,7 +1932,7 @@
                 "leader_wake": "LARGE",
                 "leader_runway": "22R",
                 "gap_behind_min": 195.0,
-                "required_behind_min": 1.0
+                "required_behind_min": 1.28
               },
               "callsign": "MQ3327"
             },
@@ -1882,6 +1994,20 @@
                 "extra_min": 45.0,
                 "alternate": "MDW",
                 "final_reserve_min": 30.0
+              },
+              "callsign": "MQ3327"
+            },
+            {
+              "rule": "PLT-CREW-DUTY",
+              "owner": "PILOT",
+              "passed": true,
+              "detail": "MQ3327: in-block T+311 <= crew duty end T+630",
+              "source": "challenge2_operational_constraints.xlsx fuel_and_crew (flight crew max duty 13 h from report; report = sched dep - 60 min, assumption)",
+              "evidence": {
+                "arrival_min": 311.0,
+                "crew_duty_end_min": 630,
+                "earliest_arrival_min": 311.0,
+                "unavoidable_bust": "no"
               },
               "callsign": "MQ3327"
             },
@@ -1975,7 +2101,7 @@
               "owner": "ATC",
               "passed": true,
               "detail": "MQ3318 on 22R (strip 04L/22R) at T+29: wake separation met (weather factor x1)",
-              "source": "challenge2_operational_constraints.xlsx wake_separation (min_time_s, simplified FAA JO 7110.65)",
+              "source": "challenge2_operational_constraints.xlsx wake_separation (min_separation_nm at 140 kt, simplified FAA JO 7110.65)",
               "evidence": {
                 "runway": "22R",
                 "strip": "04L/22R",
@@ -1986,7 +2112,7 @@
                 "leader_wake": "LARGE",
                 "leader_runway": "22R",
                 "gap_behind_min": 72.0,
-                "required_behind_min": 1.0
+                "required_behind_min": 1.28
               },
               "callsign": "MQ3318"
             },
@@ -2048,6 +2174,20 @@
                 "extra_min": 45.0,
                 "alternate": "MDW",
                 "final_reserve_min": 30.0
+              },
+              "callsign": "MQ3318"
+            },
+            {
+              "rule": "PLT-CREW-DUTY",
+              "owner": "PILOT",
+              "passed": true,
+              "detail": "MQ3318: in-block T+39 <= crew duty end T+600",
+              "source": "challenge2_operational_constraints.xlsx fuel_and_crew (flight crew max duty 13 h from report; report = sched dep - 60 min, assumption)",
+              "evidence": {
+                "arrival_min": 39.0,
+                "crew_duty_end_min": 600,
+                "earliest_arrival_min": 39.0,
+                "unavoidable_bust": "no"
               },
               "callsign": "MQ3318"
             },
@@ -2141,7 +2281,7 @@
               "owner": "ATC",
               "passed": true,
               "detail": "OO5559 on 22R (strip 04L/22R) at T+62: wake separation met (weather factor x1)",
-              "source": "challenge2_operational_constraints.xlsx wake_separation (min_time_s, simplified FAA JO 7110.65)",
+              "source": "challenge2_operational_constraints.xlsx wake_separation (min_separation_nm at 140 kt, simplified FAA JO 7110.65)",
               "evidence": {
                 "runway": "22R",
                 "strip": "04L/22R",
@@ -2152,7 +2292,7 @@
                 "leader_wake": "LARGE",
                 "leader_runway": "22R",
                 "gap_behind_min": 33.0,
-                "required_behind_min": 1.0
+                "required_behind_min": 1.28
               },
               "callsign": "OO5559"
             },
@@ -2214,6 +2354,20 @@
                 "extra_min": 45.0,
                 "alternate": "MDW",
                 "final_reserve_min": 30.0
+              },
+              "callsign": "OO5559"
+            },
+            {
+              "rule": "PLT-CREW-DUTY",
+              "owner": "PILOT",
+              "passed": true,
+              "detail": "OO5559: in-block T+72 <= crew duty end T+660",
+              "source": "challenge2_operational_constraints.xlsx fuel_and_crew (flight crew max duty 13 h from report; report = sched dep - 60 min, assumption)",
+              "evidence": {
+                "arrival_min": 72.0,
+                "crew_duty_end_min": 660,
+                "earliest_arrival_min": 72.0,
+                "unavoidable_bust": "no"
               },
               "callsign": "OO5559"
             },
@@ -2307,7 +2461,7 @@
               "owner": "ATC",
               "passed": true,
               "detail": "OO5570 on 22R (strip 04L/22R) at T+106: wake separation met (weather factor x1)",
-              "source": "challenge2_operational_constraints.xlsx wake_separation (min_time_s, simplified FAA JO 7110.65)",
+              "source": "challenge2_operational_constraints.xlsx wake_separation (min_separation_nm at 140 kt, simplified FAA JO 7110.65)",
               "evidence": {
                 "runway": "22R",
                 "strip": "04L/22R",
@@ -2318,7 +2472,7 @@
                 "leader_wake": "LARGE",
                 "leader_runway": "22R",
                 "gap_behind_min": 44.0,
-                "required_behind_min": 1.0
+                "required_behind_min": 1.28
               },
               "callsign": "OO5570"
             },
@@ -2380,6 +2534,20 @@
                 "extra_min": 45.0,
                 "alternate": "MDW",
                 "final_reserve_min": 30.0
+              },
+              "callsign": "OO5570"
+            },
+            {
+              "rule": "PLT-CREW-DUTY",
+              "owner": "PILOT",
+              "passed": true,
+              "detail": "OO5570: in-block T+116 <= crew duty end T+600",
+              "source": "challenge2_operational_constraints.xlsx fuel_and_crew (flight crew max duty 13 h from report; report = sched dep - 60 min, assumption)",
+              "evidence": {
+                "arrival_min": 116.0,
+                "crew_duty_end_min": 600,
+                "earliest_arrival_min": 116.0,
+                "unavoidable_bust": "no"
               },
               "callsign": "OO5570"
             },
@@ -2482,7 +2650,7 @@
     {
       "seq": 2,
       "round": 1,
-      "ts": "2026-10-31T05:55:16.886679+00:00",
+      "ts": "2026-10-31T06:15:28.519401+00:00",
       "sender": "ATC",
       "type": "AGENT_TURN",
       "body": {
@@ -2512,21 +2680,21 @@
               "provider": "openrouter",
               "latency_ms": 471,
               "probabilities": {
-                "ATC:change_runway:MQ3318:runway=09C": 0.32,
-                "ATC:change_runway:MQ3318:runway=09L": 0.04,
+                "ATC:change_runway:MQ3318:runway=09C": 0.29,
+                "ATC:change_runway:MQ3318:runway=09L": 0.05,
                 "ATC:change_runway:MQ3318:runway=09R": 0.05,
                 "ATC:change_runway:MQ3318:runway=10C": 0.04,
                 "ATC:change_runway:MQ3318:runway=10L": 0.02,
                 "ATC:change_runway:MQ3318:runway=10R": 0.01,
-                "ATC:change_runway:MQ3327:runway=09C": 0.24,
+                "ATC:change_runway:MQ3327:runway=09C": 0.26,
                 "ATC:change_runway:MQ3327:runway=09L": 0.07,
                 "ATC:change_runway:MQ3327:runway=09R": 0.04,
                 "ATC:change_runway:MQ3327:runway=10C": 0.04,
                 "ATC:change_runway:MQ3327:runway=10L": 0.03,
-                "ATC:change_runway:MQ3327:runway=10R": 0.03,
-                "pass": 0.07
+                "ATC:change_runway:MQ3327:runway=10R": 0.02,
+                "pass": 0.08
               },
-              "confidence": 0.26
+              "confidence": 0.23
             }
           },
           {
@@ -2548,9 +2716,9 @@
               "kind": "choice",
               "model": "typesafe/jev-1.14-20261014",
               "provider": "openrouter",
-              "latency_ms": 471,
+              "latency_ms": 464,
               "probabilities": {
-                "ATC:change_runway:MQ3327:runway=09C": 0.48,
+                "ATC:change_runway:MQ3327:runway=09C": 0.5,
                 "ATC:change_runway:MQ3327:runway=09L": 0.07,
                 "ATC:change_runway:MQ3327:runway=09R": 0.08,
                 "ATC:change_runway:MQ3327:runway=10C": 0.06,
@@ -2562,9 +2730,9 @@
                 "ATC:change_runway:OO5559:runway=10C": 0.04,
                 "ATC:change_runway:OO5559:runway=10L": 0.02,
                 "ATC:change_runway:OO5559:runway=10R": 0.02,
-                "pass": 0.07
+                "pass": 0.05
               },
-              "confidence": 0.44
+              "confidence": 0.46
             }
           },
           {
@@ -2586,23 +2754,23 @@
               "kind": "choice",
               "model": "typesafe/jev-1.14-20261014",
               "provider": "openrouter",
-              "latency_ms": 477,
+              "latency_ms": 464,
               "probabilities": {
-                "ATC:change_runway:OO5559:runway=09L": 0.34,
-                "ATC:change_runway:OO5559:runway=09R": 0.13,
-                "ATC:change_runway:OO5559:runway=10C": 0.09,
-                "ATC:change_runway:OO5559:runway=10L": 0.06,
+                "ATC:change_runway:OO5559:runway=09L": 0.38,
+                "ATC:change_runway:OO5559:runway=09R": 0.12,
+                "ATC:change_runway:OO5559:runway=10C": 0.08,
+                "ATC:change_runway:OO5559:runway=10L": 0.05,
                 "ATC:change_runway:OO5559:runway=10R": 0.03,
-                "ATC:change_runway:OO5570:runway=09L": 0.1,
-                "ATC:change_runway:OO5570:runway=09R": 0.04,
-                "ATC:change_runway:OO5570:runway=10C": 0.04,
+                "ATC:change_runway:OO5570:runway=09L": 0.11,
+                "ATC:change_runway:OO5570:runway=09R": 0.05,
+                "ATC:change_runway:OO5570:runway=10C": 0.03,
                 "ATC:change_runway:OO5570:runway=10L": 0.02,
-                "ATC:change_runway:OO5570:runway=10R": 0.03,
+                "ATC:change_runway:OO5570:runway=10R": 0.02,
                 "ATC:change_runway:MQ3318:runway=09L": 0.07,
                 "ATC:change_runway:MQ3318:runway=09R": 0.02,
-                "pass": 0.03
+                "pass": 0.02
               },
-              "confidence": 0.29
+              "confidence": 0.33
             }
           }
         ],
@@ -2696,16 +2864,16 @@
             "vote": "REJECT",
             "utility": 0.6,
             "reservation": 0.791,
-            "p_accept": 0.04,
-            "reason": "typesafe/jev-1.14-20261014: P(accept)=0.04 (utility 0.600, reservation 0.791)"
+            "p_accept": 0.05,
+            "reason": "typesafe/jev-1.14-20261014: P(accept)=0.05 (utility 0.600, reservation 0.791)"
           },
           {
             "plan_id": "c22ae40bd4",
             "vote": "ACCEPT",
             "utility": 0.879,
             "reservation": 0.791,
-            "p_accept": 0.93,
-            "reason": "typesafe/jev-1.14-20261014: P(accept)=0.93 (utility 0.879, reservation 0.791)"
+            "p_accept": 0.92,
+            "reason": "typesafe/jev-1.14-20261014: P(accept)=0.92 (utility 0.879, reservation 0.791)"
           }
         ],
         "rationale": "Turn 1: Move MQ3318 from 22R to runway 09C; Move MQ3327 from 22R to runway 09C; Move OO5559 from 22R to runway 09L; 0 move(s) vetoed by the engine; own utility 0.879; accepts 1/2 valid plan(s) at reservation 0.791",
@@ -2713,7 +2881,7 @@
           "kind": "noul",
           "model": "typesafe/jev-1.14-20261014",
           "provider": "openrouter",
-          "latency_ms": 597
+          "latency_ms": 463
         }
       },
       "rationale": "Turn 1: Move MQ3318 from 22R to runway 09C; Move MQ3327 from 22R to runway 09C; Move OO5559 from 22R to runway 09L; 0 move(s) vetoed by the engine; own utility 0.879; accepts 1/2 valid plan(s) at reservation 0.791",
@@ -2721,13 +2889,13 @@
         "kind": "noul",
         "model": "typesafe/jev-1.14-20261014",
         "provider": "openrouter",
-        "latency_ms": 597
+        "latency_ms": 463
       }
     },
     {
       "seq": 3,
       "round": 1,
-      "ts": "2026-10-31T05:55:16.887033+00:00",
+      "ts": "2026-10-31T06:15:28.519767+00:00",
       "sender": "ENGINE",
       "type": "CHECK",
       "body": {
@@ -2737,12 +2905,12 @@
         "proposed_by": "ATC",
         "violations": []
       },
-      "rationale": "ATC's proposal passes all 44 checks"
+      "rationale": "ATC's proposal passes all 48 checks"
     },
     {
       "seq": 4,
       "round": 1,
-      "ts": "2026-10-31T05:55:17.810975+00:00",
+      "ts": "2026-10-31T06:15:29.457868+00:00",
       "sender": "PILOT:OO5559",
       "type": "AGENT_TURN",
       "body": {
@@ -2841,16 +3009,16 @@
             "vote": "ACCEPT",
             "utility": 0.45,
             "reservation": 0.417,
-            "p_accept": 0.75,
-            "reason": "typesafe/jev-1.14-20261014: P(accept)=0.75 (utility 0.450, reservation 0.417)"
+            "p_accept": 0.74,
+            "reason": "typesafe/jev-1.14-20261014: P(accept)=0.74 (utility 0.450, reservation 0.417)"
           },
           {
             "plan_id": "c22ae40bd4",
             "vote": "ACCEPT",
             "utility": 0.463,
             "reservation": 0.417,
-            "p_accept": 0.85,
-            "reason": "typesafe/jev-1.14-20261014: P(accept)=0.85 (utility 0.463, reservation 0.417)"
+            "p_accept": 0.84,
+            "reason": "typesafe/jev-1.14-20261014: P(accept)=0.84 (utility 0.463, reservation 0.417)"
           }
         ],
         "rationale": "Turn 1: no move (keeps the plan on the table); 0 move(s) vetoed by the engine; own utility 0.463; accepts 2/2 valid plan(s) at reservation 0.417",
@@ -2858,7 +3026,7 @@
           "kind": "noul",
           "model": "typesafe/jev-1.14-20261014",
           "provider": "openrouter",
-          "latency_ms": 451
+          "latency_ms": 444
         }
       },
       "rationale": "Turn 1: no move (keeps the plan on the table); 0 move(s) vetoed by the engine; own utility 0.463; accepts 2/2 valid plan(s) at reservation 0.417",
@@ -2866,13 +3034,13 @@
         "kind": "noul",
         "model": "typesafe/jev-1.14-20261014",
         "provider": "openrouter",
-        "latency_ms": 451
+        "latency_ms": 444
       }
     },
     {
       "seq": 5,
       "round": 1,
-      "ts": "2026-10-31T05:55:18.713453+00:00",
+      "ts": "2026-10-31T06:15:30.425182+00:00",
       "sender": "GROUND",
       "type": "AGENT_TURN",
       "body": {
@@ -2971,16 +3139,16 @@
             "vote": "ACCEPT",
             "utility": 0.615,
             "reservation": 0.585,
-            "p_accept": 0.74,
-            "reason": "typesafe/jev-1.14-20261014: P(accept)=0.74 (utility 0.615, reservation 0.585)"
+            "p_accept": 0.75,
+            "reason": "typesafe/jev-1.14-20261014: P(accept)=0.75 (utility 0.615, reservation 0.585)"
           },
           {
             "plan_id": "c22ae40bd4",
             "vote": "ACCEPT",
             "utility": 0.65,
             "reservation": 0.585,
-            "p_accept": 0.88,
-            "reason": "typesafe/jev-1.14-20261014: P(accept)=0.88 (utility 0.650, reservation 0.585)"
+            "p_accept": 0.86,
+            "reason": "typesafe/jev-1.14-20261014: P(accept)=0.86 (utility 0.650, reservation 0.585)"
           }
         ],
         "rationale": "Turn 1: no move (keeps the plan on the table); 0 move(s) vetoed by the engine; own utility 0.650; accepts 2/2 valid plan(s) at reservation 0.585",
@@ -2988,7 +3156,7 @@
           "kind": "noul",
           "model": "typesafe/jev-1.14-20261014",
           "provider": "openrouter",
-          "latency_ms": 430
+          "latency_ms": 487
         }
       },
       "rationale": "Turn 1: no move (keeps the plan on the table); 0 move(s) vetoed by the engine; own utility 0.650; accepts 2/2 valid plan(s) at reservation 0.585",
@@ -2996,13 +3164,13 @@
         "kind": "noul",
         "model": "typesafe/jev-1.14-20261014",
         "provider": "openrouter",
-        "latency_ms": 430
+        "latency_ms": 487
       }
     },
     {
       "seq": 6,
       "round": 1,
-      "ts": "2026-10-31T05:55:18.714570+00:00",
+      "ts": "2026-10-31T06:15:30.426364+00:00",
       "sender": "ENGINE",
       "type": "CONSENSUS",
       "body": {

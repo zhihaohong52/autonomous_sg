@@ -444,7 +444,8 @@
           "source": "seeded model",
           "detail": null
         }
-      ]
+      ],
+      "crew_duty_end_min": 630
     },
     {
       "callsign": "MQ3318",
@@ -520,7 +521,8 @@
           "source": "seeded model",
           "detail": null
         }
-      ]
+      ],
+      "crew_duty_end_min": 600
     },
     {
       "callsign": "OO5559",
@@ -591,7 +593,8 @@
           "source": "seeded model",
           "detail": null
         }
-      ]
+      ],
+      "crew_duty_end_min": 660
     },
     {
       "callsign": "OO5570",
@@ -662,7 +665,8 @@
           "source": "seeded model",
           "detail": null
         }
-      ]
+      ],
+      "crew_duty_end_min": 600
     }
   ],
   "gates": [

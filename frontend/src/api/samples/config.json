@@ -14,7 +14,7 @@
     "decision",
     "decision+claude"
   ],
-  "default_mode": "decision",
+  "default_mode": "formulas",
   "models": [
     {
       "id": "liquid/d1-ultra",
@@ -44,7 +44,7 @@
       "benchmark_rank": 1
     }
   ],
-  "default_model": "liquid/d1-ultra",
+  "default_model": "typesafe/jev-1.14",
   "llm_available": true,
   "tracing": false,
   "replay_available": true

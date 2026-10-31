@@ -77,14 +77,15 @@ Components (all under `atm/`):
 
 - **Wave builder** (`wave/flights2015.py`, `wave/build.py`): builds the wave from a `flights.csv` row (or a BTS 2024 wave), real runways, METAR, FAA registry and OSM gates, plus seeded simulation of what no public source has. Deterministic per id.
 - **Workbook limits** (`wave/constraints.py`): airport capacity, wake table, fuel and crew rules parsed from `data/challenge2/challenge2_operational_constraints.xlsx` (sheet `rules_of_play`), with hard-coded fallbacks equal to the workbook.
-- **Rules engine** (`wave/rules.py`): every check is a formula, and every result cites rule, source and input values. Eleven rules:
+- **Rules engine** (`wave/rules.py`): every check is a formula, and every result cites rule, source and input values. Twelve rules:
   - `ATC-RWY-OPEN`: runway exists and is open.
-  - `ATC-WAKE-SEP`: workbook wake time between leader and follower on the same physical runway (x1.25 when wet or low visibility).
+  - `ATC-WAKE-SEP`: workbook wake distance (3-8 nm) between leader and follower on the same physical runway, converted to time at 140 kt (x1.25 when wet or low visibility).
   - `ATC-RWY-CAPACITY`: arrivals per runway per rolling 60 min within the workbook cap.
   - `ATC-TAXI-ROUTE`: taxi route to the gate is usable.
   - `ATC-WIND-LIMITS`: crosswind and tailwind from real METAR against FAA Order 8400.9 section 6d and demonstrated crosswind by type.
   - `PLT-EARLIEST-ETA`: no landing before the flight can physically arrive.
   - `PLT-FUEL-RESERVE`: hold fits within extra fuel above alternate plus 30 min final reserve.
+  - `PLT-CREW-DUTY`: in-block (or alternate arrival) within 13 h of crew report time; report = scheduled departure - 60 min. A bust that even the earliest landing cannot avoid is reported, not vetoed.
   - `GND-GATE-SIZE`: gate fits the aircraft.
   - `GND-GATE-FREE`: gate not occupied, including by other wave flights, with the airport turnaround time.
   - `GND-GATE-NOTICE`: gate changes need at least 20 min notice.
@@ -104,15 +105,15 @@ Every change and assumption is returned in `result.limits`. Summary:
 
 | Limit | What we do | Source |
 |---|---|---|
-| Wake separation | Workbook times (Super 180 s, Heavy 120 s, Large to Small 60 s, other 60 s), applied to arrivals on the same physical runway | workbook, applied to arrivals |
+| Wake separation | Workbook distances (`min_separation_nm`, 3-8 nm) converted to time at a 140 kt approach speed (3 nm = 77 s, 5 nm = 129 s, 8 nm = 206 s); same physical runway | workbook (nm column); 140 kt is an assumption |
 | Wet or low-visibility factor | x1.25 on wake times | assumption |
 | B757 | Treated as Heavy | assumption |
 | Runways and wind | Real runways and METAR instead of the workbook runway count (used only as the capacity divisor) | real data |
 | Runway capacity | `max_runway_ops_per_hour / active_runways` per runway; counts arrivals only | workbook, arrivals only |
-| Turnaround, gates, spare gates | Per airport from workbook; wave models `min(gates, 12)` gates plus an unlimited remote stand | workbook, simplification |
+| Turnaround, gates, spare gates | Per airport from workbook (turnaround 45/35 min, spare gates); wave models `min(gates, 12)` gates plus a remote stand with 2 positions | workbook; remote stand is an assumption |
 | Fuel burn, reserve, spare | 2400 / 6500 kg/h, 30 min final reserve, 45 min spare fuel | workbook |
-| Contingency fuel 5% | Not modelled (no trip fuel in the data) | assumption |
-| Flight crew 13 h duty | Not enforced (no report time in the data) | assumption |
+| Contingency fuel 5% | Not credited: it covers en-route deviations, and the workbook's 45 min spare-on-arrival is what is checked at the destination. Not crediting it is the conservative reading | assumption |
+| Flight crew 13 h duty | Enforced by `PLT-CREW-DUTY`; report time = scheduled departure - 60 min | workbook; report offset is an assumption |
 | Ground shift | 8 h, overtime at 1.5x is a cost, not illegal | workbook |
 | Gate change notice | At least 20 min; remote stand exempt | workbook |
 | Speed reduction | Capped at 8 min | assumption |
@@ -155,29 +156,30 @@ Method (`python3 -m atm.wave.benchmark --n 50 --arms <models>,formula --concurre
 - Engine-off ablation: the share of formula-arm final plans that are infeasible under the real rules when the rules engine is disabled.
 
 <!-- BENCHMARK -->
-Run: `python3 -m atm.wave.benchmark --source flights2015 --n 50 --arms openrouter:typesafe/jev-1.14,openrouter:liquid/d1-ultra,openrouter:baseten/elephant-1,formula --concurrency 4 --seed 7 --outage-n 20` (31 Oct 2026, live models). Same 50 flights.csv rows (seeded, stratified over 30 hubs) for every arm; all arms finished all 50.
+Run: `python3 -m atm.wave.benchmark --source flights2015 --n 50 --arms openrouter:typesafe/jev-1.14,openrouter:liquid/d1-ultra,openrouter:baseten/elephant-1,formula --concurrency 4 --seed 7 --outage-n 20` (31 Oct 2026, live models, final rules). Same 50 flights.csv rows (seeded, stratified over 30 hubs) for every arm; all arms finished all 50.
 
 | Arm | Consensus | Mean turns | Solver fallback | Rule violations | Delay (min/wave) | Pax protected | Brier* | p50 / p95 ms | Errors | Same plan as formulas |
 |---|---|---|---|---|---|---|---|---|---|---|
-| typesafe/jev-1.14 | 90% | 1.40 | 10% | 0 | 360.3 | 24.4% | 0.0313 | 458 / 549 | 0% | 28% |
-| liquid/d1-ultra | 82% | 1.52 | 18% | 0 | 351.7 | 25.5% | 0.0045 | 609 / 772 | 0% | 68% |
-| baseten/elephant-1 | 68% | 1.64 | 32% | 0 | 350.5 | 25.8% | 0.0023 | 539 / 714 | 0% | 34% |
+| typesafe/jev-1.14 | 92% | 1.40 | 8% | 0 | 360.4 | 24.1% | 0.0294 | 458 / 554 | 0% | 30% |
+| liquid/d1-ultra | 80% | 1.54 | 20% | 0 | 351.8 | 25.5% | 0.0040 | 604 / 878 | 0% | 68% |
+| baseten/elephant-1 | 68% | 1.64 | 32% | 0 | 350.5 | 25.8% | 0.0023 | 537 / 640 | 0% | 34% |
 | formula | 98% | 1.32 | 2% | 0 | 351.7 | 25.5% | n/a | n/a / n/a | 0% | 100% |
 | status quo (no negotiation) | - | - | - | breaks a rule on 16/50 waves | 343.5 | 26.5% | - | - | - | - |
 
 \* Brier is measured against the formula verdict (accept if utility >= reservation), not ground truth.
 
-- **Selection: `formula`.** Rule: best outcome among arms with error < 2%, p95 < 1 s and consensus >= 90%; tie -> lower Brier. jev-1.14 is the only model that meets all three gates (p95 549 ms, 0% errors, 90% consensus) but its mean delay is worse than the formulas', so the formulas win. d1-ultra and elephant-1 miss the consensus gate; part of their delay numbers come from the deterministic solver, not the agents.
+- **Selection: `formula`.** Rule: best outcome among arms with error < 2%, p95 < 1 s and consensus >= 90%; tie -> lower Brier. jev-1.14 is the only model that meets all three gates (p95 554 ms, 0% errors, 92% consensus) but its mean delay is worse than the formulas', so the formulas win. d1-ultra and elephant-1 miss the consensus gate; part of their delay numbers come from the deterministic solver, not the agents. **The live app therefore defaults to formulas mode**; decision mode is opt-in, with the chain jev-1.14 -> d1-ultra -> elephant-1 -> formulas.
+- **Why formulas win here:** consensus is judged against the same utility/reservation rule the formula agents apply, so three formula agents agree more readily than three independently-reasoning models; the formulas also rank moves by the full known-violation count, so fewer moves are vetoed. Models track the formula verdict closely (low Brier) but small disagreements cost unanimity and push waves to the solver.
 - **Status quo comparison, honestly:** the status quo breaks at least one rule on 16 of 50 waves, so it is not a valid plan there. On the 34 waves where it is legal, its mean delay is 339.2 min vs typesafe/jev-1.14 337.4, liquid/d1-ultra 337.4, baseten/elephant-1 337.7, formula 337.2 for the negotiated plans: about 2 min better, i.e. negotiation mostly buys legality, not delay.
 - **Safety:** 0 rule violations in any final plan, every arm. **Engine-off ablation:** with the rule engine disabled, 32% of the agents' final plans break a rule.
-- **Outage test:** primary model replaced by a dead endpoint on 20 waves; 20/20 resolved with a legal plan, 137 decisions answered by the next model in the chain.
+- **Outage test:** primary model replaced by a dead endpoint on 20 waves; 20/20 resolved with a legal plan, 127 decisions answered by the next model in the chain.
 - Full report: `eval/BENCHMARK.md`, raw data `eval/benchmark.json` (31 failure rows listed there, all "solver fallback" outcomes).
 <!-- /BENCHMARK -->
 
 ### Demo replays
 
 Recorded runs in `data/replay/` (live jev-1.14) play back with no model calls:
-- `F2015-69315` ATL, fog: no agreement in 3 turns, the deterministic solver lands DL2239 on 08L at gate E16, +26 min (the fallback path, with its reason in the log).
+- `F2015-69315` ATL, fog: no agreement in 3 turns, the deterministic solver lands DL2239 on 08L at gate T14, +26 min (the fallback path, with its reason in the log).
 - `F2015-75` DFW, crosswind runway closures: AA1344 on 13L, gate A38, +119 min; agreed in turn 1.
 - `F2015-77162` DEN, closures: DL927 on runway 25, gate C35, +133 min; turn 1.
 - `F2015-270287` ORD: OO5559 on 09L, gate B18, +57 min; turn 1.
