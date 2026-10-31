@@ -213,24 +213,27 @@ Method (`python3 -m atm.wave.benchmark --n 50 --arms <models>,formula --concurre
 - Engine-off ablation: the share of formula-arm final plans that are infeasible under the real rules when the rules engine is disabled.
 
 <!-- BENCHMARK -->
-Run: `python3 -m atm.wave.benchmark --source flights2015 --n 50 --arms openrouter:typesafe/jev-1.14,openrouter:liquid/d1-ultra,openrouter:baseten/elephant-1,formula --concurrency 4 --seed 7 --outage-n 20` (31 Oct 2026, live models, final rules). Same 50 flights.csv rows (seeded, stratified over 30 hubs) for every arm; all arms finished all 50.
+Run: `python3 -m atm.wave.benchmark --source flights2015 --n 50 --arms openrouter:typesafe/jev-1.14,openrouter:liquid/d1-ultra,openrouter:baseten/elephant-1,formula --concurrency 4 --seed 7 --outage-n 20` (31 Oct 2026, live models, final rules). Same 50 flights.csv rows (seeded, stratified over 30 hubs) for every arm; all arms finished all 50. "Old prompts" is the same run before the prompt change below (raw: same command at the previous commit).
 
-| Arm | Consensus | Mean turns | Solver fallback | Rule violations | Total delay, all wave arrivals (min) | Pax protected | Brier* | p50 / p95 ms | Errors | Same plan as formulas |
-|---|---|---|---|---|---|---|---|---|---|---|
-| typesafe/jev-1.14 | 92% | 1.40 | 8% | 0 | 360.4 | 24.1% | 0.0294 | 458 / 554 | 0% | 30% |
-| liquid/d1-ultra | 80% | 1.54 | 20% | 0 | 351.8 | 25.5% | 0.0040 | 604 / 878 | 0% | 68% |
-| baseten/elephant-1 | 68% | 1.64 | 32% | 0 | 350.5 | 25.8% | 0.0023 | 537 / 640 | 0% | 34% |
-| formula | 98% | 1.32 | 2% | 0 | 351.7 | 25.5% | n/a | n/a / n/a | 0% | 100% |
-| status quo (no negotiation) | - | - | - | breaks a rule on 16/50 waves | 343.5 | 26.5% | - | - | - | - |
+| Arm | Consensus (old prompts → judgement-only) | Mean turns | Solver fallback | Rule violations | Total delay, all wave arrivals (min) [95% CI] | Gap to optimiser (min) | Pax protected | Brier* | p50 / p95 ms | Errors | Same plan as formulas |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| typesafe/jev-1.14 | 94% → **98%** | 1.32 | 2% | 0 | 362.0 [313, 411] | 11.7 | 24.6% | 0.0055 | 529 / 670 | 0% | 62% |
+| liquid/d1-ultra | 82% → **98%** | 1.32 | 2% | 0 | 362.2 [313, 412] | 12.0 | 24.3% | 0.0015 | 648 / 916 | 0% | 80% |
+| baseten/elephant-1 | 68% → **98%** | 1.32 | 2% | 0 | 362.2 [313, 411] | 11.9 | 24.6% | 0.0108 | 602 / 722 | 0% | 70% |
+| formula | 98% | 1.32 | 2% | 0 | 351.7 [305, 398] | 1.4 | 25.5% | n/a | n/a / n/a | 0% | 100% |
+| centralised optimiser (beam search, no negotiation) | - | - | - | 0 infeasible | 350.3 [303, 397] | 0 | 25.8% | - | ~2.3 s/wave | - | - |
+| status quo (no negotiation) | - | - | - | breaks a rule on 16/50 waves | 343.5 | - | 26.5% | - | - | - | - |
 
 \* Brier is measured against the formula verdict (accept if utility >= reservation), not ground truth.
 
-- **Selection: `formula`.** Rule: best outcome among arms with error < 2%, p95 < 1 s and consensus >= 90%; tie -> lower Brier. jev-1.14 is the only model that meets all three gates (p95 554 ms, 0% errors, 92% consensus) but its mean delay is worse than the formulas', so the formulas win. d1-ultra and elephant-1 miss the consensus gate; part of their delay numbers come from the deterministic solver, not the agents. **The live app therefore defaults to formulas mode**; decision mode is opt-in, with the chain jev-1.14 -> d1-ultra -> elephant-1 -> formulas.
-- **Why formulas win here:** consensus is judged against the same utility/reservation rule the formula agents apply, so three formula agents agree more readily than three independently-reasoning models; the formulas also rank moves by the full known-violation count, so fewer moves are vetoed. Models track the formula verdict closely (low Brier) but small disagreements cost unanimity and push waves to the solver.
-- **Status quo comparison, honestly:** the status quo breaks at least one rule on 16 of 50 waves, so it is not a valid plan there. On the 34 waves where it is legal, its mean delay is 339.2 min vs typesafe/jev-1.14 337.4, liquid/d1-ultra 337.4, baseten/elephant-1 337.7, formula 337.2 for the negotiated plans: about 2 min better, i.e. negotiation mostly buys legality, not delay.
-- **Safety:** 0 rule violations in any final plan, every arm. **Engine-off ablation:** with the rule engine disabled, 32% of the agents' final plans break a rule.
-- **Outage test:** primary model replaced by a dead endpoint on 20 waves; 20/20 resolved with a legal plan, 127 decisions answered by the next model in the chain.
-- Full report: `eval/BENCHMARK.md`, raw data `eval/benchmark.json` (31 failure rows listed there, all "solver fallback" outcomes).
+- **Code does the maths, the model judges.** Following TypeSafe's System One guidance ("keep deterministic work in code"), the decision models no longer see raw utilities. Code pre-computes every comparison into words: for each move, whether it fixes or adds rule breaches, whether it is better or worse for the agent, and the engine's rank; for each vote, whether the plan meets the agent's minimum this turn, with explicit yes/no criteria. The model only makes the final pick and the accept/reject. **Result: all three models went to 98% consensus in 1.32 turns, the same as the formulas** (jev-1.14 94%, d1-ultra 82%, elephant-1 68% before), with 0 errors and 0 rule violations.
+- **What it did not fix:** the models' plans carry about 10 min more total delay than the formula arm (about 12 min above the optimiser, against 1.4 min for the formulas). The models pick different moves among options the engine ranks close (they match the formula's plan on 62-80% of waves). The 95% intervals overlap widely (±47 min), so at n = 50 this difference is not significant, but we report it as it is.
+- **Selection: `formula`** by the rule: best outcome among arms with error < 2%, p95 < 1 s and consensus >= 90%; tie -> lower Brier. All three models now pass every gate (error < 2%, p95 < 1 s, consensus >= 90%); the formulas win on mean delay. The app defaults to formulas mode; decision mode is opt-in (jev-1.14 first).
+- **How good is "good"?** The centralised optimiser (the beam-search solver run on each wave with no negotiation) is the reference for the best plan one coordinator finds. The formula agents land within 1.4 min of it: decentralised negotiation between three self-interested agents loses almost nothing against central control.
+- **Status quo, honestly:** it breaks at least one rule on 16 of 50 waves. On the 34 waves where it is legal, its mean delay is 339.2 min, about 2 min better than the negotiated plans on those waves: negotiation buys legality, not minutes.
+- **Safety:** 0 rule violations in any final plan, every arm. **Engine-off ablation:** 32% of the agents' final plans break a rule when the engine is disabled.
+- **Outage test:** primary model replaced by a dead endpoint on 20 waves; 20/20 resolved with a legal plan.
+- Full report: `eval/BENCHMARK.md`, raw data `eval/benchmark.json`.
 <!-- /BENCHMARK -->
 
 ### Demo replays
