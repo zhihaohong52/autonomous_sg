@@ -166,6 +166,14 @@ class Assignment(_Dict):
         return (self.callsign, self.action, self.runway, self.slot_min, self.gate,
                 self.speed_reduction_min, self.ground_delay_min)
 
+    def to_dict(self) -> dict:
+        """Contract Assignment: runway / slot_min / gate are optional, omitted when None."""
+        d = asdict(self)
+        for k in ("runway", "slot_min", "gate"):
+            if d[k] is None:
+                del d[k]
+        return d
+
 
 @dataclass
 class JointPlan(_Dict):
