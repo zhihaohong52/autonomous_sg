@@ -2,7 +2,7 @@ import type { JointPlan, Move, RuleCheck, WaveScenario } from "../api/types";
 import { clock } from "../format";
 
 const TURN = { narrow: 40, wide: 90 } as const;
-const W = 832, LABEL = 64, RIGHT = 8, LANE = 25, BAR = 18, AXIS = 22, GAP = 14;
+const W = 1158, LABEL = 64, RIGHT = 8, LANE = 25, BAR = 18, AXIS = 22, GAP = 14;
 const SPAN = 90;                                   // T+0 … T+90 minutes
 const x = (min: number) => LABEL + (Math.max(0, Math.min(SPAN, min)) / SPAN) * (W - LABEL - RIGHT);
 
@@ -46,7 +46,7 @@ export function Gantt({ wave, plan, rejection }: { wave: WaveScenario; plan: Joi
               {!r.open && (
                 <>
                   <rect x={x(0)} y={y + 4} width={x(SPAN) - x(0)} height={BAR} fill="url(#hatch)" rx={3} />
-                  <text x={x(0) + 8} y={y + 16} style={{ fill: "var(--soft)" }}>Closed · {r.closed_reason}</text>
+                  <text x={x(0) + 8} y={y + 16} style={{ fill: "var(--muted)" }}>Closed · {r.closed_reason}</text>
                 </>
               )}
               {wave.queue.filter((q) => q.runway === r.id).map((q) => (
@@ -84,12 +84,12 @@ export function Gantt({ wave, plan, rejection }: { wave: WaveScenario; plan: Joi
           return (
             <g key={a.callsign}>
               <g className="wave" style={{ transform: `translate(${x(slot)}px, ${ry}px)` }}>
-                {a.metrics.hold_min > 0 && <line x1={x(holdFrom) - x(slot)} x2={0} y1={13} y2={13} stroke="var(--accent)" strokeDasharray="2 3" />}
-                <rect x={0} y={4} width={8} height={BAR} rx={2} fill="var(--accent)" />
-                <text x={crowded ? -4 : 12} y={16} textAnchor={crowded ? "end" : "start"} style={{ font: "500 11px var(--mono)", fill: "var(--accent)" }}>{a.callsign}</text>
+                {a.metrics.hold_min > 0 && <line x1={x(holdFrom) - x(slot)} x2={0} y1={13} y2={13} stroke="var(--hue)" strokeDasharray="2 3" />}
+                <rect x={0} y={4} width={8} height={BAR} rx={2} fill="var(--hue)" />
+                <text x={crowded ? -4 : 12} y={16} textAnchor={crowded ? "end" : "start"} style={{ font: "500 11px var(--mono)", fill: "var(--hue)" }}>{a.callsign}</text>
               </g>
               <g className="wave" style={{ transform: `translate(${x(inb)}px, ${gy}px)` }}>
-                <rect x={0} y={4} width={Math.max(8, x(end) - x(inb))} height={BAR} rx={3} fill="var(--accent)" />
+                <rect x={0} y={4} width={Math.max(8, x(end) - x(inb))} height={BAR} rx={3} fill="var(--hue)" />
                 <text className="bar-label" x={6} y={16}>{a.callsign}</text>
               </g>
               <title>{`${a.callsign}: runway ${a.runway} ${clock(wave.window_start, slot)}, gate ${a.gate} ${clock(wave.window_start, inb)}`}</title>
@@ -114,7 +114,7 @@ export function Gantt({ wave, plan, rejection }: { wave: WaveScenario; plan: Joi
 export function GanttLegend() {
   return (
     <div className="legend">
-      <span><i style={{ background: "var(--accent)" }} />Negotiated flights</span>
+      <span><i style={{ background: "var(--hue)" }} />Negotiated flights</span>
       <span><i style={{ background: "var(--queue)" }} />Fixed traffic</span>
       <span><i style={{ background: "var(--busy)" }} />Gate in use</span>
     </div>

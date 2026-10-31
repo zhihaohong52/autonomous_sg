@@ -86,9 +86,9 @@ export function Checks({ wave, ev, base }: { wave: WaveScenario; ev: PlanEvaluat
   const find = (rule: RuleId, cs: string) => e?.checks.find((c) => c.rule === rule && c.callsign === cs) ?? e?.checks.find((c) => c.rule === rule && !c.callsign);
   const chosen: RuleCheck | undefined = pick ? find(pick.rule, pick.cs) : undefined;
   return (
-    <div className="card">
+    <section>
       <div className="card-head">
-        <h2>Safety rules</h2>
+        <h3>{e ? `${e.checks.filter((c) => !c.passed).length ? `${e.checks.filter((c) => !c.passed).length} rule breach${e.checks.filter((c) => !c.passed).length === 1 ? "" : "es"}` : "Every rule passes"} in the ${which === "plan" ? "agreed plan" : "status quo"}` : "Nine rules, every flight"}</h3>
         {ev && <div className="seg" role="group" aria-label="Plan to check">
           <button aria-pressed={which === "plan"} onClick={() => { setWhich("plan"); setSel(null); }} disabled={!ev}>Agreed plan</button>
           <button aria-pressed={which === "base"} onClick={() => { setWhich("base"); setSel(null); }} disabled={!base}>Status quo</button>
@@ -102,12 +102,12 @@ export function Checks({ wave, ev, base }: { wave: WaveScenario; ev: PlanEvaluat
               <tbody>
                 {RULES.map((r) => (
                   <tr key={r.id}>
-                    <td style={{ height: 34 }}>{r.name} <span className="code muted" style={{ fontSize: 11 }}>{r.id}</span></td>
+                    <td>{r.name} <span className="code muted" style={{ fontSize: 11 }}>{r.id}</span></td>
                     {wave.flights.map((f) => {
                       const c = find(r.id, f.callsign);
                       const on = pick?.rule === r.id && pick.cs === f.callsign;
                       return (
-                        <td key={f.callsign} style={{ height: 34 }}>
+                        <td key={f.callsign}>
                           {c ? (
                             <button className={`cell${c.passed ? "" : " fail"}`} aria-pressed={on} onClick={() => setSel({ rule: r.id, cs: f.callsign })}
                               aria-label={`${r.name} for ${f.callsign}: ${c.passed ? "pass" : "fail"}`}>{c.passed ? "Pass" : "Fail"}</button>
@@ -134,7 +134,7 @@ export function Checks({ wave, ev, base }: { wave: WaveScenario; ev: PlanEvaluat
           </div>
         </>
       )}
-    </div>
+    </section>
   );
 }
 
@@ -142,9 +142,9 @@ export function Checks({ wave, ev, base }: { wave: WaveScenario; ev: PlanEvaluat
 export function Weather({ wave }: { wave: WaveScenario }) {
   const m = wave.metar;
   return (
-    <div className="card">
-      <div className="card-head"><h2>Weather and runways</h2><span className="meta">{m ? `METAR ${clock(m.observed_at, 0)}` : "No METAR"}</span></div>
-      {m ? <p className="code" style={{ fontSize: 12, color: "var(--soft)", marginBottom: 12, overflowWrap: "anywhere" }}>{m.raw}</p>
+    <section>
+      <div className="card-head"><h3>Weather and runways</h3><span className="meta">{m ? `METAR ${clock(m.observed_at, 0)}` : "No METAR"}</span></div>
+      {m ? <p className="code" style={{ fontSize: 13, color: "var(--soft)", marginBottom: 12, overflowWrap: "anywhere" }}>{m.raw}</p>
         : <p className="empty" style={{ marginBottom: 12 }}>No METAR for this hour; wind limits use the generic model.</p>}
       {!wave.runway_wind.length ? <p className="empty">No wind components for this wave's runways.</p> : <table>
         <thead><tr><th>Runway</th><th className="num">Head</th><th className="num">Cross</th><th className="num">Limit</th><th>Status</th></tr></thead>
@@ -164,15 +164,15 @@ export function Weather({ wave }: { wave: WaveScenario }) {
         </tbody>
       </table>}
       {wave.runway_wind.length > 0 && <p className="muted" style={{ fontSize: 12, marginTop: 10 }}>Limits: {[...new Set(wave.runway_wind.map((w) => w.limit_source))].join("; ")}. Crosswind includes gusts.</p>}
-    </div>
+    </section>
   );
 }
 
 /* ---------- data sources ---------- */
 export function Sources({ wave }: { wave: WaveScenario }) {
   return (
-    <div className="card">
-      <div className="card-head"><h2>Data sources</h2><span className="meta">{wave.provenance.filter((p) => p.status === "real").length} of {wave.provenance.length} layers real</span></div>
+    <section>
+      <div className="card-head"><h3>Data sources</h3><span className="meta">{wave.provenance.filter((p) => p.status === "real").length} of {wave.provenance.length} layers real</span></div>
       <dl className="kv">
         <dt>per flight</dt><dd><span className="pill warn" style={{ marginRight: 8 }}>simulated</span>{[...new Set(wave.flights.flatMap((f) => f.provenance.filter((p) => p.status !== "real").map((p) => p.layer)))].join(", ")}, seeded</dd>
         {wave.provenance.map((p) => (
@@ -180,6 +180,6 @@ export function Sources({ wave }: { wave: WaveScenario }) {
             <dd><span className={`pill ${p.status === "real" ? "" : "warn"}`} style={{ marginRight: 8 }}>{p.status}</span>{p.source}</dd></Fragment>
         ))}
       </dl>
-    </div>
+    </section>
   );
 }

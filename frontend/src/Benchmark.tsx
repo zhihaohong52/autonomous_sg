@@ -30,7 +30,6 @@ export function Benchmark() {
     <main className="canvas">
       <header className="titlerow">
         <div>
-          <p className="product">Disruption Negotiator</p>
           <h1>Benchmark</h1>
           <p className="sub">{rep ? <>{rep.n_waves} real waves, seed {rep.seed}, every arm on the same waves. <b>Winner: {rep.selection.winner}</b> ({rep.selection.rule}).</> : "Each decision model against the formulas and the status quo on the same real waves."}</p>
         </div>
