@@ -92,6 +92,11 @@ def _dest_frame(dest: str) -> pd.DataFrame:
                                  "sched_arr": "int32", "diverted": "int8", "cancelled": "int8"})
 
 
+def _supported(dest: str) -> bool:
+    """Destinations with runway data (data/ref/runways.csv); others (e.g. CID) cannot be negotiated."""
+    return dest in B._runways_by_airport()
+
+
 def list_rows(airport: str | None = None, q: str | None = None, limit: int = 50, offset: int = 0) -> list[dict]:
     return search(airport, q, limit, offset)[0]
 
@@ -107,6 +112,8 @@ def search(airport: str | None = None, q: str | None = None, limit: int = 50, of
         if r["cancelled"] == "1":
             continue
         if ap and r["dest"] != ap:
+            continue
+        if not _supported(r["dest"]):
             continue
         cs = _callsign(r["carrier"], r["flight_no"])
         if qq and qq not in f"{cs} {r['tail']} {r['origin']} {r['dest']} {PREFIX}{r['row_id']}".upper():
@@ -276,7 +283,7 @@ def _flight(row_id: int, iata: str, date: str, hour: int, r: dict, disrupted: bo
 
     sched_min = float(r["sched_min"])
     late, carr = float(r["late_aircraft_delay"]), float(r["carrier_delay"])
-    eta_earliest = sched_min + late + carr   # weather delay is what the negotiation absorbs (as build.py)
+    eta_earliest = sched_min + late + carr + float(r["weather_delay"]) + float(r["nas_delay"])  # as build.py
 
     arr_abs = B._hhmm_min(r["sched_arr"])
     dep_abs = B._hhmm_min(r["sched_dep"])
@@ -331,6 +338,8 @@ def build_from_row(row_id: int) -> Wave:
     if row["cancelled"] == "1":
         raise KeyError(f"{PREFIX}{row_id}")
     iata, date = row["dest"], row["arr_date"]
+    if not _supported(iata):
+        raise KeyError("unsupported airport")
     df = _dest_frame(iata)
     df = df[(df["arr_date"] == date) & (df["cancelled"] == 0)]
     focus_abs = B._hhmm_min(row["sched_arr"])

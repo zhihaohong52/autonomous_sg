@@ -70,10 +70,15 @@ LIMITS = [
      "is exempt (assumption, always staffed)"},
     {"limit": "runway capacity", "value": "arrivals per runway per rolling 60 min <= max_runway_ops_per_hour / "
      "active_runways", "source": "workbook", "note": "applied to every real physical runway (strip); "
-     "fixed queue arrivals count but only wave flights can be vetoed"},
+     "fixed queue arrivals count but only wave flights can be vetoed; arrivals only; departures not "
+     "modelled (relaxation)"},
     {"limit": "runways and wind", "value": "real runway ids, headings and METAR", "source": "real data",
      "note": "real runways are used instead of the workbook active_runways count, which is only the divisor "
      "of the capacity cap; crosswind/tailwind limits from FAA Order 8400.9 / AFM"},
+    {"limit": "remote stand", "value": "1 stand, unlimited positions", "source": "assumption",
+     "note": "exempt from gate notice; costs taxi time"},
+    {"limit": "speed reduction cap", "value": f"{MAX_SPEED_REDUCTION_MIN:g} min", "source": "assumption",
+     "note": "maximum en-route speed reduction a pilot may use to absorb delay"},
     {"limit": "turnaround / gate occupancy", "value": "airport min_turnaround_min", "source": "workbook",
      "note": "45 min at large hubs, 35 min at medium/small hubs"},
 ]
@@ -85,7 +90,8 @@ def limits_for(wave: Wave) -> list[dict]:
     return LIMITS + [{"limit": f"{lim.iata} airport limits", "value":
                       f"{lim.size_class}: active_runways {lim.active_runways}, max_runway_ops_per_hour "
                       f"{lim.max_runway_ops_per_hour} -> {cap:g} arrivals/runway/h, min_turnaround "
-                      f"{lim.min_turnaround_min} min, gates {lim.gates}, spare gates {lim.spare_gates}",
+                      f"{lim.min_turnaround_min} min, gates {lim.gates}, spare gates {lim.spare_gates}; wave models "
+                      f"min(gates, 12) gates (+ remote stand)",
                       "source": "workbook",
                       "note": f"real runways at {wave.airport.icao}: "
                               f"{len({strip_of(r.id) for r in wave.airport.runways})} physical "

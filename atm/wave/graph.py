@@ -90,25 +90,38 @@ def _vkeys(checks) -> set[tuple[str, str | None]]:
     return {(c.rule, c.callsign) for c in checks if not c.passed}
 
 
-def _known_violations(agent: str, checks, known: set[str]) -> int:
+def _own_flight(c, cs: str) -> bool:
+    """A check belongs to flight `cs` when it names it (callsign field, or the detail text for
+    multi-flight rules such as gate conflicts)."""
+    return c.callsign == cs or cs in c.detail
+
+
+def _counted(agent: str, checks, known: set[str]) -> list:
+    """Failed checks counted as 'known violations' for `agent`. A PILOT judges only its own flight
+    (it cannot fix other flights' problems by moving itself); ATC/GROUND count their own rules plus
+    any rule the engine has published as vetoed."""
     role = _role(agent)
-    cs = agent.split(":", 1)[1] if role == "PILOT" else None
-    n = 0
-    for c in checks:
-        if c.passed:
-            continue
-        own = c.owner == role and (cs is None or c.callsign == cs)
-        if own or c.rule in known:
-            n += 1
-    return n
+    if role == "PILOT":
+        cs = agent.split(":", 1)[1]
+        return [c for c in checks if not c.passed and _own_flight(c, cs)]
+    return [c for c in checks if not c.passed and (c.owner == role or c.rule in known)]
+
+
+def _known_violations(agent: str, checks, known: set[str]) -> int:
+    return len(_counted(agent, checks, known))
 
 
 def _known_rules(agent: str, checks, known: set[str]) -> list[str]:
     """Sorted distinct rule ids counted by _known_violations (what the agent may be told)."""
-    role = _role(agent)
-    cs = agent.split(":", 1)[1] if role == "PILOT" else None
-    return sorted({c.rule for c in checks if not c.passed
-                   and ((c.owner == role and (cs is None or c.callsign == cs)) or c.rule in known)})
+    return sorted({c.rule for c in _counted(agent, checks, known)})
+
+
+def _divert_justified(w: Wave, agent: str, checks) -> bool:
+    """A pilot requests diversion only if its own flight fails the fuel reserve or no runway is open."""
+    cs = agent.split(":", 1)[1]
+    if not any(r.open for r in w.airport.runways):
+        return True
+    return any(not c.passed and c.rule == "PLT-FUEL-RESERVE" and c.callsign == cs for c in checks)
 
 
 def _maxmin(wave: Wave, plan: JointPlan) -> tuple[float, float]:
@@ -285,7 +298,7 @@ def _triage(st: S) -> dict:
              "flights": len(w.flights), "disrupted": sum(f.disrupted for f in w.flights),
              "queue": len(w.queue)}
     buf: list[dict] = []
-    d = run.decider("ATC", 0, buf)  # triage has no agent; MODEL_FALLBACK is attributed to ATC
+    d = run.decider("DECIDER", 0, buf)  # triage has no agent; MODEL_FALLBACK is attributed to DECIDER
     r = d.score(state, "Rate the operational severity of this arrival-wave disruption at the hub.",
                 SEVERITY_LEVELS, formula)
     run.account(r)
@@ -344,6 +357,7 @@ def _agent_moves(run: _Run, agent: str, rnd: int, table: JointPlan, known: set[s
         before_v = _vkeys(before_checks)
         u_now = agent_utility(w, plan, agent)
         k_now = _known_violations(agent, before_checks, known)
+        divert_ok = _role(agent) != "PILOT" or _divert_justified(w, agent, before_checks)
         info = {}
         for i, mv in enumerate(opts):
             after = moves.apply(w, plan, mv)
@@ -366,7 +380,9 @@ def _agent_moves(run: _Run, agent: str, rnd: int, table: JointPlan, known: set[s
                 options[PASS] = f"Make no further move | your utility stays {u_now:.3f}"
 
             def formula(avail=avail, has_accept=has_accept) -> str:
-                best = min(avail, key=lambda k: (avail[k][4], -avail[k][3], k))
+                cand = {k: v for k, v in avail.items()
+                        if not (v[0].kind == "request_divert" and not divert_ok)} or avail
+                best = min(cand, key=lambda k: (cand[k][4], -cand[k][3], k))
                 b = avail[best]
                 if b[0].kind != "accept" and (b[4] < k_now or (b[4] == k_now and b[3] > u_now + 1e-9)):
                     return best

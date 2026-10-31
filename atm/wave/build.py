@@ -382,10 +382,11 @@ def _build_flight(wave_id: str, iata: str, date: str, hour: int, r: dict, disrup
 
     sched_min = float(r["sched_min"])
     late, carr = float(r["late_aircraft_delay"]), float(r["carrier_delay"])
-    # Earliest feasible arrival: a late inbound aircraft / carrier problem means it cannot
-    # arrive earlier than sched + late_aircraft + carrier delay. Weather delay is deliberately
-    # excluded: that is what the negotiation must absorb (holding, sequencing, diversion).
-    eta_earliest = sched_min + late + carr
+    wx, nas = float(r["weather_delay"]), float(r["nas_delay"])
+    # Earliest feasible arrival: the BTS-attributed delay (late inbound aircraft, carrier,
+    # weather, NAS) is already baked into when the aircraft can arrive. The negotiation absorbs
+    # the remaining airport-side congestion (holding, sequencing, diversion).
+    eta_earliest = sched_min + late + carr + wx + nas
 
     arr_abs = _hhmm_min(r["sched_arr"])
     dep_hhmm = _num(r.get("sched_dep"))
@@ -452,9 +453,10 @@ def build_wave(wave_id: str) -> Wave:
     if wave_id.startswith("F2015-"):
         from atm.wave import flights2015   # lazy: flights2015 imports this module
         try:
-            return flights2015.build_from_row(int(wave_id[6:]))
+            row_id = int(wave_id[6:])
         except ValueError:
             raise KeyError(wave_id) from None
+        return flights2015.build_from_row(row_id)
     iata, date, hour = _parse_id(wave_id)
     row = _index_row(wave_id)
     w = _window_rows(iata, date, hour)

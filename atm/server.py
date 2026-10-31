@@ -379,7 +379,7 @@ async def negotiate_wave(request: Request, body: dict = Body(...)):
                                  headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
     try:
-        wave = WB.build_wave(wave_id)
+        wave = await asyncio.to_thread(WB.build_wave, wave_id)
     except KeyError:
         return _err(404, "unknown_wave", f"unknown wave id {wave_id!r}")
     except Exception as e:  # noqa: BLE001

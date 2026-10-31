@@ -273,3 +273,11 @@ def test_divert_delay_includes_existing_delay():
     w2 = _r(w, flights=[late] + list(w.flights[1:]))
     m = metrics(w2, Assignment(f.callsign, "divert", None, None, None, 0.0, 0.0, FlightMetrics()))
     assert m.delay_min == pytest.approx(200 + float(f.fuel["alternate_min"]) + DIVERT_EXTRA_DELAY_MIN)
+
+
+def test_limits_entries_present():
+    from atm.wave import rules
+    names = {l["limit"]: l for l in rules.LIMITS}
+    assert names["remote stand"]["value"] == "1 stand, unlimited positions"
+    assert "speed reduction cap" in names
+    assert "departures not modelled" in names["runway capacity"]["note"]
