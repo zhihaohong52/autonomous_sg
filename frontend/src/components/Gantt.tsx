@@ -34,9 +34,13 @@ export function Gantt({ wave, plan, other, turn, rejection }: Props) {
   const gatesShown = wave.gates.filter((g) => usedGate.has(g.id));
   const hiddenGates = wave.gates.length - gatesShown.length;
 
-  // the axis covers the wave hour plus 15 min, and reaches back to the earliest landing or in-block shown
+  // the axis covers the wave hour plus 15 min, reaches back to the earliest landing or in-block shown,
+  // and forward to the last landing, gate turnaround or fixed arrival (capped at 3 h; later ones are labelled at the edge)
   const times = plans.flatMap((p) => land(p).flatMap((a) => [a.slot_min ?? 0, a.metrics.in_block_min ?? 0]));
-  const START = Math.min(0, Math.floor((Math.min(0, ...times) - 3) / 15) * 15), END = 75;
+  const lastPlan = plans.flatMap((p) => land(p).map((a) => (a.metrics.in_block_min ?? a.slot_min ?? 0) + turn));
+  const lastQueue = wave.queue.map((q) => q.slot_min + 2);
+  const START = Math.min(0, Math.floor((Math.min(0, ...times) - 3) / 15) * 15);
+  const END = Math.min(180, Math.max(75, Math.ceil((Math.max(0, ...lastPlan, ...lastQueue) + 3) / 15) * 15));
   const x = (m: number) => LABEL + ((Math.max(START, Math.min(END, m)) - START) / (END - START)) * (W - LABEL - RIGHT);
 
   const yRwy = (id: string) => AXIS + runways.findIndex((r) => r.id === id) * LANE;
@@ -125,6 +129,18 @@ export function Gantt({ wave, plan, other, turn, rejection }: Props) {
           const near = (o: typeof a) => o !== a && o.runway === a.runway && Math.abs((o.slot_min ?? 0) - slot) < 7;
           const after = land(plan).some((o) => near(o) && (o.slot_min ?? 0) > slot);
           const before = land(plan).some((o) => near(o) && (o.slot_min ?? 0) <= slot && o.callsign < a.callsign);
+          const offAxis = (m: number, y: number) => (
+            <text x={x(END)} y={y + 15} textAnchor="end" style={{ font: "500 12px var(--mono)", fill: "var(--hue)" }}>
+              {`${a.callsign} → ${clock(wave.window_start, m)}`}
+            </text>
+          );
+          if (slot > END) return (
+            <g key={a.callsign}>
+              {offAxis(slot, ry)}
+              {item && offAxis(inb, gy)}
+              <title>{`${a.callsign}: runway ${a.runway} ${clock(wave.window_start, slot)}, gate ${a.gate} ${clock(wave.window_start, inb)} (after the chart)`}</title>
+            </g>
+          );
           return (
             <g key={a.callsign}>
               <g className="wave" style={{ transform: `translate(${x(slot)}px, ${ry}px)` }}>
