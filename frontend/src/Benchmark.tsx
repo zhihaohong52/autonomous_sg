@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, ApiError } from "./api/client";
-import type { BenchmarkReport } from "./api/types";
+import type { BenchmarkReport, ModelInfo } from "./api/types";
 import { dateLabel } from "./format";
 
 type Arm = BenchmarkReport["arms"][number];
@@ -20,6 +20,8 @@ const COLS: { key: keyof Arm["summary"]; label: string; unit: string; digits: nu
 export function Benchmark() {
   const [rep, setRep] = useState<BenchmarkReport | null>(null);
   const [err, setErr] = useState<{ code: string; message: string } | null>(null);
+  const [models, setModels] = useState<ModelInfo[]>([]);
+  useEffect(() => { api.config().then((c) => setModels(c.models)).catch(() => setModels([])); }, []);
   useEffect(() => {
     api.benchmark().then(setRep).catch((e) => setErr(e instanceof ApiError ? { code: e.code, message: e.message } : { code: "error", message: String(e) }));
   }, []);
@@ -37,8 +39,23 @@ export function Benchmark() {
 
       {!rep ? (
         <section className="card">
-          <div className="card-head"><h2>Model arms</h2></div>
-          <p className="empty">{err?.code === "not_found" || err?.code === "404" ? "The benchmark has not been generated yet. It appears here once the backend has run it." : err ? `Couldn't load the benchmark: ${err.message}` : "Loading…"}</p>
+          <div className="card-head"><h2>Model arms</h2><span className="meta">{err ? "Not generated yet" : "Loading…"}</span></div>
+          <p className="empty" style={{ marginBottom: 16 }}>{err?.code === "not_found" || err?.code === "404"
+            ? "The benchmark has not been run yet. Each arm below gets its figures once the backend has run it on the same real waves."
+            : err ? `Couldn't load the benchmark: ${err.message}` : "Loading the benchmark…"}</p>
+          <div className="table-wrap" tabIndex={0} role="region" aria-label="Model arms, not yet measured">
+            <table>
+              <thead><tr><th>Model</th>{COLS.map((c) => <th key={c.key} className="num">{c.label}</th>)}</tr></thead>
+              <tbody>
+                {[...models, { id: "status-quo", provider: "formula", label: "Status quo (first come, first served)", available: true } as ModelInfo].map((m) => (
+                  <tr key={m.id}>
+                    <td><span className="code">{m.label}</span><span className="sub">{m.id === "status-quo" ? "baseline" : m.provider}{m.available ? "" : " · unavailable"}</span></td>
+                    {COLS.map((c) => <td key={c.key} className="num muted">—</td>)}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </section>
       ) : (
         <div className="grid">

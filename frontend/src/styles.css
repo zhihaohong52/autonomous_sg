@@ -226,3 +226,5 @@ td .sub { display: block; font-size: var(--fs-small); color: var(--muted); line-
 }
 /* inside a card the empty state is a quiet sentence, not a second box */
 .card .empty { border: 0; padding: 0; font-size: 13px; }
+/* keep every sentence inside a card to a readable measure */
+.empty, .card p:not(.code) { max-width: 68ch; }
