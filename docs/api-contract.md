@@ -1,6 +1,6 @@
 # API contract: Disruption Negotiator v2 (wave mode)
 
-Status: **v1.1, 31 Oct 2026 12:45** (added `Triage`; `/api/eval` marked v1). Frozen at 12:30 for the frontend; any later change is
+Status: **v1.2, 31 Oct 2026 12:55** (added `Triage`; `/api/eval` marked v1; benchmark brier/latency/ablation nullable). Frozen at 12:30 for the frontend; any later change is
 announced in the commit message with the prefix `contract:`. Design: `docs/superpowers/specs/2026-10-31-disruption-negotiator-design.md`.
 
 The frontend (Vite + React + TS, `frontend/`) talks only to these endpoints. In dev, Vite proxies
@@ -325,12 +325,12 @@ interface BenchmarkReport {
       consensus_rate_pct: number; mean_rounds: number; fallback_rate_pct: number;
       rule_violations_in_agreed_plans: number;
       delay_min: number; fuel_kg: number; pax_protected_pct: number; overtime_min: number;
-      agreement_with_formula_pct: number; brier: number;
-      latency_p50_ms: number; latency_p95_ms: number; error_rate_pct: number; cost_usd_per_wave: number;
+      agreement_with_formula_pct: number; brier: number | null;
+      latency_p50_ms: number | null; latency_p95_ms: number | null; error_rate_pct: number; cost_usd_per_wave: number;
     };
   }[];
   baseline: { delay_min: number; fuel_kg: number; pax_protected_pct: number; overtime_min: number; diversions: number };
-  ablation_no_engine_unsafe_pct: number;
+  ablation_no_engine_unsafe_pct: number | null;   // null = not run
   outage_test: { primary_disabled: string; waves: number; resolved: number; fallbacks_used: Record<string, number> };
   selection: { winner: string; rule: string; reasons: string[] };
   failures: { wave_id: string; model: string; reason: string }[];   // clickable: open the wave
