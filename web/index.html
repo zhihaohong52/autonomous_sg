@@ -8,7 +8,7 @@
 <style>
 :root{
   --bg:#0b0f14;--panel:#121820;--panel2:#18202b;--line:#253041;--text:#e6edf3;--muted:#8b98a8;
-  --atc:#4ea1ff;--pilot:#ffb547;--ground:#3ddc84;--engine:#cfd6de;
+  --atc:#4ea1ff;--pilot:#ffb547;--ground:#3ddc84;--engine:#cfd6de;--jev:#a78bfa;
   --ok:#3ddc84;--bad:#ff5a5f;--warn:#ffb547;
   --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
 }
@@ -67,6 +67,25 @@ ul.plain{margin:4px 0;padding-left:18px}
 .s-PILOT{border-left-color:var(--pilot)} .s-PILOT .who{color:var(--pilot)}
 .s-GROUND{border-left-color:var(--ground)} .s-GROUND .who{color:var(--ground)}
 .s-ENGINE{border-left-color:var(--engine)} .s-ENGINE .who{color:var(--engine)}
+.s-JEV{border-left-color:var(--jev)} .s-JEV .who{color:var(--jev)}
+.triage{background:#1d1530;border:1px solid #6d4bb8;border-left:4px solid var(--jev);border-radius:6px;padding:10px 12px;margin:5px 0;animation:fadein .25s ease}
+.sev{display:inline-flex;gap:3px;vertical-align:middle;margin:0 8px}
+.sev i{width:16px;height:16px;border-radius:3px;background:#2b2342;border:1px solid #4a3a75}
+.sev i.on{background:var(--jev);border-color:var(--jev)}
+.pbar{display:grid;grid-template-columns:auto 1fr 40px;gap:6px;align-items:center;font-size:12px;margin:2px 0}
+.pbar .track{height:6px;background:#0b0f14;border-radius:3px;overflow:hidden}
+.pbar .fill{height:100%;background:var(--jev)}
+.jevtag{font-size:11px;padding:1px 6px;border-radius:4px;background:#2b1f4a;color:#d4c2ff;border:1px solid #6d4bb8;margin-left:6px}
+.chip.jp{color:#d4c2ff;border-color:#4a3a75}
+.plan-line.jchoice{outline:1px solid #6d4bb8;border-radius:3px;padding:1px 3px}
+.vote .d:has(.vp){min-width:128px}
+.vp{display:inline-block;width:46px;height:4px;background:#0b0f14;border-radius:2px;overflow:hidden;vertical-align:middle;margin-left:4px}
+.vp b{display:block;height:100%}
+.brief{background:#17132a;border:1px solid #6d4bb8}
+.brief .src{font-size:11px;color:#b9a6ff;margin-bottom:6px}
+.brief .txt{font-size:15px;line-height:1.5}
+details summary{cursor:pointer;color:var(--muted);font-size:12px;margin-top:8px}
+details ol{font-size:13px;padding-left:20px;margin:6px 0}
 .msg.fail{border-left-color:var(--bad);background:#2a1215;border:1px solid #6b2226;border-left-width:4px}
 .msg.fail .head{color:#ffb3b5;font-weight:600}
 .msg.passsum{border-left-color:var(--ok);background:#0f2218;color:#9ff0c0}
@@ -76,7 +95,7 @@ ul.plain{margin:4px 0;padding-left:18px}
 .chip{font-family:var(--mono);font-size:11px;padding:1px 5px;border-radius:3px;background:#0b0f14;border:1px solid var(--line)}
 .chip.ATC{color:var(--atc)} .chip.PILOT{color:var(--pilot)} .chip.GROUND{color:var(--ground)}
 .vote{display:flex;gap:8px;font-size:13px;margin-top:2px}
-.vote .d{font-weight:700;width:62px;font-family:var(--mono)}
+.vote .d{font-weight:700;flex:0 0 auto;min-width:62px;white-space:nowrap;font-family:var(--mono)}
 .vote .d.ACCEPT{color:var(--ok)} .vote .d.REJECT{color:var(--bad)}
 .banner{border-radius:6px;padding:10px 12px;margin:8px 0;font-weight:600;animation:fadein .3s ease}
 .banner.cons{background:#0f3020;border:1px solid var(--ok);color:#b9f5d0}
@@ -115,7 +134,7 @@ footer{padding:10px 18px 18px;color:var(--muted);font-size:12px;border-top:1px s
 <header>
   <div>
     <h1>Disruption Negotiator</h1>
-    <div class="sub">ATC · Pilot · Ground agents, deterministic safety engine, human approves</div>
+    <div class="sub">Jev decides · Claude explains · rules guarantee safety · human approves</div>
   </div>
   <div class="controls">
     <div class="search">
@@ -124,8 +143,10 @@ footer{padding:10px 18px 18px;color:var(--muted);font-size:12px;border-top:1px s
     </div>
     <button class="btn" id="btnRandom">Random disrupted flight</button>
     <div class="seg" id="policySeg">
-      <label><input type="radio" name="policy" value="rule" checked><span>Decision models only</span></label>
-      <label id="llmLabel" title=""><input type="radio" name="policy" value="llm"><span>LLM agents</span></label>
+      <label data-p="rule"><input type="radio" name="policy" value="rule" checked><span>Formulas only</span></label>
+      <label data-p="jev"><input type="radio" name="policy" value="jev"><span>Jev decisions</span></label>
+      <label data-p="jev+claude"><input type="radio" name="policy" value="jev+claude"><span>Jev + Claude narration</span></label>
+      <label data-p="llm"><input type="radio" name="policy" value="llm"><span>Claude decides</span></label>
     </div>
     <button class="btn primary" id="btnNeg" disabled>Negotiate</button>
   </div>
@@ -151,6 +172,7 @@ footer{padding:10px 18px 18px;color:var(--muted);font-size:12px;border-top:1px s
     </div>
   </section>
   <section>
+    <div id="briefBox" style="display:none"></div>
     <div class="panel decision" id="decisionPanel"><h2>Decision</h2><div class="empty">Awaiting negotiation.</div></div>
   </section>
 </main>
@@ -185,12 +207,20 @@ function post(path, body){ return api(path,{method:"POST",headers:{"Content-Type
 api("/api/config").then(function(c){
   state.cfg=c;
   $("cfgInfo").textContent = (c.n_disruptions!=null? c.n_disruptions+" real disrupted flights" : "") + (c.model? " · LLM model: "+c.model : "");
-  if(!c.llm_available){
-    var l=$("llmLabel"); l.classList.add("disabled"); l.title="LLM agents unavailable: no API key configured on the server";
-    l.querySelector("input").disabled=true;
+  function gate(p, ok, why){
+    var l=document.querySelector('#policySeg label[data-p="'+p+'"]'); if(!l) return;
+    var inp=l.querySelector("input");
+    if(Array.isArray(c.policies) && c.policies.indexOf(p)<0){ ok=false; why="Mode not offered by this server"; }
+    if(!ok){ l.classList.add("disabled"); l.title=why; inp.disabled=true; if(inp.checked){ inp.checked=false; document.querySelector('input[name=policy][value=rule]').checked=true; } }
+    else { l.classList.remove("disabled"); l.title=""; inp.disabled=false; }
   }
+  gate("jev", !!c.jev_available, "Jev unavailable: model not installed on the server");
+  gate("jev+claude", !!c.jev_available, "Jev unavailable: model not installed on the server (Claude narration needs Jev decisions)");
+  gate("llm", !!c.llm_available, "Claude unavailable: no Anthropic API key configured on the server");
 }).catch(function(){ $("cfgInfo").textContent="config unavailable"; });
 
+var MODE_NAMES={"rule":"Formulas only","jev":"Jev decisions","jev+claude":"Jev + Claude narration","llm":"Claude decides"};
+function modeName(p){ return MODE_NAMES[p]||p||"-"; }
 function policy(){ var r=document.querySelector('input[name=policy]:checked'); return r?r.value:"rule"; }
 
 /* ---------- tabs ---------- */
@@ -236,7 +266,7 @@ function selectFlight(f){
   $("btnNeg").disabled=false;
   renderFlight(f, null);
   $("timeline").innerHTML='<div class="empty">Ready. Press <b>Negotiate</b> to let ATC, Pilot and Ground agents negotiate.</div>';
-  $("decisionPanel").innerHTML='<h2>Decision</h2><div class="empty">Awaiting negotiation.</div>';
+  $("decisionPanel").innerHTML='<h2>Decision</h2><div class="empty">Awaiting negotiation.</div>'; $("briefBox").style.display="none";
   $("scenarioPanel").innerHTML='<h2>Scenario</h2><div class="muted"><span class="spinner"></span>Building scenario...</div>';
   api("/api/scenario/"+encodeURIComponent(f.id)).then(function(sc){
     if(state.flight!==f) return;
@@ -310,9 +340,9 @@ function negotiate(){
   var pol=policy(); stopAnim(); state.decided=false;
   $("btnNeg").disabled=true; $("btnRandom").disabled=true;
   var t0=Date.now();
-  var msg = pol==="llm" ? "LLM agents are negotiating (typically 20-60 s)..." : "Decision models are negotiating...";
+  var msg = pol==="llm" ? "Claude agents are negotiating (typically 20-60 s)..." : pol==="jev+claude" ? "Jev agents are negotiating, then Claude writes the brief..." : pol==="jev" ? "Jev agents are negotiating..." : "Decision-model formulas are negotiating...";
   $("timeline").innerHTML='<div class="empty"><span class="spinner"></span>'+esc(msg)+' <span id="elapsed" class="mono">0s</span></div>';
-  $("decisionPanel").innerHTML='<h2>Decision</h2><div class="empty">Negotiation in progress...</div>';
+  $("decisionPanel").innerHTML='<h2>Decision</h2><div class="empty">Negotiation in progress...</div>'; $("briefBox").style.display="none";
   var tick=setInterval(function(){ var e=$("elapsed"); if(e) e.textContent=Math.round((Date.now()-t0)/1000)+"s"; },500);
   post("/api/negotiate",{flight_id:state.flight.id, policy:pol}).then(function(d){
     clearInterval(tick);
@@ -363,11 +393,11 @@ function playTimeline(d){
   var res=obj(d.result), tl=$("timeline");
   tl.innerHTML="";
   var head=document.createElement("div"); head.className="muted"; head.style.fontSize="12px"; head.style.marginBottom="8px";
-  head.textContent="Policy: "+(res.policy==="llm"?"LLM agents":"decision models")+(res.elapsed_s!=null?" · computed in "+num(res.elapsed_s,2)+" s":"")+" · "+arr(res.log).length+" messages";
+  head.textContent="Mode: "+modeName(res.policy)+(res.elapsed_s!=null?" · computed in "+num(res.elapsed_s,2)+" s":"")+" · "+arr(res.log).length+" messages";
   tl.appendChild(head);
   if(arr(res.llm_errors).length){
     var le=document.createElement("div"); le.className="banner nocons";
-    le.innerHTML="LLM errors ("+res.llm_errors.length+"), agents fell back to decision models where needed: <span class='mono' style='font-weight:400'>"+esc(res.llm_errors.slice(0,3).map(function(x){return typeof x==="string"?x:JSON.stringify(x);}).join(" | "))+"</span>";
+    le.innerHTML="Some model calls failed; the decision-model formulas stood in for: <ul class='plain mono' style='font-weight:400;font-size:12px'>"+res.llm_errors.slice(0,6).map(function(x){return "<li>"+esc(typeof x==="string"?x:JSON.stringify(x))+"</li>";}).join("")+(res.llm_errors.length>6?"<li>... and "+(res.llm_errors.length-6)+" more</li>":"")+"</ul>";
     tl.appendChild(le);
   }
   var items=buildItems(res), i=0, roundEl=tl;
@@ -377,7 +407,7 @@ function playTimeline(d){
     var it=items[i++];
     if(it.kind==="round"){
       roundEl=document.createElement("div"); roundEl.className="round";
-      roundEl.innerHTML='<div class="rh">Round '+esc(it.round)+'</div>'; tl.appendChild(roundEl);
+      roundEl.innerHTML=roundHead(it.round); tl.appendChild(roundEl);
     } else {
       var el=renderItem(it); if(el){ roundEl.appendChild(el); try{ el.scrollIntoView({block:"nearest",behavior:"smooth"}); }catch(e){} }
     }
@@ -389,7 +419,7 @@ function playTimeline(d){
     clearTimeout(state.animTimer);
     while(i<items.length){
       var it=items[i++];
-      if(it.kind==="round"){ roundEl=document.createElement("div"); roundEl.className="round"; roundEl.innerHTML='<div class="rh">Round '+esc(it.round)+'</div>'; tl.appendChild(roundEl); }
+      if(it.kind==="round"){ roundEl=document.createElement("div"); roundEl.className="round"; roundEl.innerHTML=roundHead(it.round); tl.appendChild(roundEl); }
       else { var el=renderItem(it); if(el){ el.style.animation="none"; roundEl.appendChild(el); } }
     }
     stopAnim(); renderDecision(d);
@@ -397,6 +427,8 @@ function playTimeline(d){
   step();
 }
 
+function roundHead(r){ return '<div class="rh">'+(String(r)==="0"?'Triage':'Round '+esc(r))+'</div>'; }
+function pBar(label, p, color){ var v=Number(p); var w=isNaN(v)?0:Math.max(0,Math.min(1,v))*100; return '<div class="pbar"><span>'+esc(label)+'</span><div class="track"><div class="fill" style="width:'+w+'%'+(color?';background:'+color:'')+'"></div></div><span class="mono">'+num(p,2)+'</span></div>'; }
 function utilChips(u){
   u=obj(u);
   return AGENTS.filter(function(a){return u[a]!=null;}).map(function(a){ return '<span class="chip '+a+'">'+a[0]+' '+num(u[a],2)+'</span>'; }).join("");
@@ -413,10 +445,25 @@ function renderItem(it){
   var m=it.m, b=obj(m.body), s=m.sender||"ENGINE";
   el.className="msg s-"+s;
   var h='<span class="who">'+esc(s)+'</span><span class="typ">'+esc(m.type)+'</span>';
-  if(m.type==="PROPOSE"){
+  if(m.type==="TRIAGE"){
+    el.className="triage";
+    var sc=Number(b.score), n=isNaN(sc)?0:Math.round(sc);
+    h='<span class="who" style="color:var(--jev)">'+esc(s)+'</span><span class="typ">TRIAGE</span> Severity <span class="sev">'+[1,2,3,4,5].map(function(i){return '<i class="'+(i<=n?'on':'')+'"></i>';}).join("")+'</span><b class="mono" style="font-size:18px">'+(isNaN(sc)?'-':esc(num(sc)))+' / 5</b>';
+    if(b.legend) h+='<div style="margin-top:4px">'+esc(typeof b.legend==="string"?b.legend:(obj(b.legend)[n]||JSON.stringify(b.legend)))+'</div>';
+    var pr=b.probabilities;
+    if(pr && typeof pr==="object"){
+      var keys=Array.isArray(pr)?pr.map(function(_,i){return String(i+1);}):Object.keys(pr);
+      h+='<div style="margin-top:6px;max-width:340px">'+keys.map(function(k,i){ var v=Array.isArray(pr)?pr[i]:pr[k]; return pBar("sev "+k, v); }).join("")+'</div>';
+    }
+    var meta=[]; if(b.confidence!=null) meta.push("confidence "+num(b.confidence,2)); if(b.latency_s!=null) meta.push(num(b.latency_s,2)+" s");
+    if(meta.length) h+='<div class="muted" style="font-size:12px;margin-top:3px">'+esc(meta.join(" · "))+'</div>';
+  } else if(m.type==="PROPOSE"){
+    var jv=b.jev && typeof b.jev==="object" ? b.jev : null, jp=jv?obj(jv.probabilities):{};
+    if(jv){ h+='<span class="jevtag">Jev Choice'+(jv.confidence!=null?' · conf '+num(jv.confidence,2):'')+(jv.latency_s!=null?' · '+num(jv.latency_s,2)+' s':'')+'</span>'; }
+    var jline=function(id){ if(!jv) return ""; var t=jp[id]!=null?'<span class="chip jp">p '+num(jp[id],2)+'</span>':''; if(jv.choice===id) t+='<span class="chip jp" style="background:#2b1f4a">&#9733; Jev pick</span>'; return t; };
     var plans=arr(b.plans);
-    if(plans.length){ plans.forEach(function(p){ p=obj(p); h+='<div class="plan-line">▸ '+esc(p.label||obj(p.plan).id)+' '+utilChips(p.utility)+'</div>'; }); }
-    else arr(b.plan_ids).forEach(function(id){ h+='<div class="plan-line">▸ '+esc(lbl(id))+'</div>'; });
+    if(plans.length){ plans.forEach(function(p){ p=obj(p); var id=obj(p.plan).id; h+='<div class="plan-line'+(jv&&jv.choice===id?' jchoice':'')+'">▸ '+esc(p.label||id)+' '+utilChips(p.utility)+jline(id)+'</div>'; }); }
+    else arr(b.plan_ids).forEach(function(id){ h+='<div class="plan-line">▸ '+esc(lbl(id))+jline(id)+'</div>'; });
   } else if(m.type==="CHECK"){
     if(!b.passed){
       el.className="msg fail";
@@ -427,7 +474,9 @@ function renderItem(it){
       h+=' ✓ '+esc(lbl(b.plan_id))+' passed';
     }
   } else if(m.type==="VOTE"){
-    arr(b.votes).forEach(function(v){ v=obj(v); h+='<div class="vote"><span class="d '+esc(v.decision)+'">'+esc(v.decision)+'</span><span>'+esc(lbl(v.plan_id))+' <span class="muted">u='+num(v.utility,2)+' · '+esc(v.reason||"")+'</span></span></div>'; });
+    arr(b.votes).forEach(function(v){ v=obj(v); var pa=Number(v.p_accept), hasP=v.p_accept!=null&&!isNaN(pa);
+      var pv=hasP?(v.decision==="REJECT"?1-pa:pa):null;
+      h+='<div class="vote"><span class="d '+esc(v.decision)+'">'+esc(v.decision)+(hasP?' '+num(pa,2)+'<span class="vp" title="p(accept) = '+num(pa,2)+'"><b style="width:'+Math.max(0,Math.min(1,pa))*100+'%;background:'+(pa>=0.5?'var(--ok)':'var(--bad)')+'"></b></span>':'')+'</span><span>'+esc(lbl(v.plan_id))+' <span class="muted">u='+num(v.utility,2)+' · '+esc(v.reason||"")+'</span></span></div>'; });
     if(!arr(b.votes).length) h+=' <span class="muted">no valid plans to vote on</span>';
   } else if(m.type==="CONSENSUS"){
     el.className="banner cons";
@@ -463,6 +512,7 @@ function renderDecision(d){
   var isFb = res.outcome==="fallback";
   var h='<h2><span>Decision</span><span class="outcome '+(isFb?'fb':'cons')+'">'+(isFb?'Deterministic fallback':'Consensus in round '+esc(res.rounds))+'</span></h2>';
   h+='<div style="font-size:20px;font-weight:700;margin:4px 0 8px">'+esc(p.label||pid||"-")+'</div>';
+  h+='<div class="muted" style="font-size:12px;margin-top:-4px;margin-bottom:6px">Mode: <b style="color:var(--text)">'+esc(modeName(res.policy))+'</b></div>';
   if(p.feasible===false) h+='<div class="err">Engine marks this plan INFEASIBLE.</div>';
   var vf=arr(res.violations_in_final);
   if(vf.length) h+='<div class="err">Violations in final plan: '+esc(vf.map(function(v){return typeof v==="string"?v:(v.rule||JSON.stringify(v));}).join(", "))+'</div>';
@@ -509,6 +559,14 @@ function renderDecision(d){
   h+='<div style="display:flex;gap:8px"><button class="btn ok" id="btnApprove">Approve plan</button><button class="btn bad" id="btnOverride">Override</button></div>';
   h+='<div id="ovBox" style="display:none"><textarea id="ovNote" placeholder="Reason for override / alternative instruction (required)"></textarea><div style="display:flex;gap:8px;margin-top:6px"><button class="btn bad" id="btnOvSubmit">Submit override</button><button class="btn" id="btnOvCancel">Cancel</button></div></div>';
   h+='<div id="decMsg"></div></div>';
+  var nar=res.narration && typeof res.narration==="object" ? res.narration : null;
+  if(nar){
+    var src = nar.source==="claude" ? "Written by Claude"+(nar.model?" "+nar.model:"") : "Template (Claude unavailable)";
+    var nb='<div class="panel brief"><h2><span>Duty manager brief</span></h2><div class="src">'+esc(src)+(nar.error?' · <span class="badc">'+esc(nar.error)+'</span>':'')+'</div><div class="txt">'+esc(nar.brief||"(no brief)")+'</div>';
+    var ln=arr(nar.lines); if(ln.length) nb+='<details><summary>Plain-English transcript ('+ln.length+' lines)</summary><ol>'+ln.map(function(x){return '<li>'+esc(x)+'</li>';}).join("")+'</ol></details>';
+    nb+='</div>';
+    var bx=$("briefBox"); if(bx){ bx.innerHTML=nb; bx.style.display=""; }
+  }
   $("decisionPanel").innerHTML=h;
   $("btnApprove").onclick=function(){ sendDecision("APPROVE",""); };
   $("btnOverride").onclick=function(){ $("ovBox").style.display="block"; $("ovNote").focus(); };
@@ -539,7 +597,13 @@ function fmtObj(v){ return Object.keys(v).map(function(k){ var x=v[k]; return '<
 function loadEval(){
   var el=$("evalPanel");
   el.innerHTML='<h2>Evaluation</h2><div class="muted"><span class="spinner"></span>Loading...</div>';
-  api("/api/eval").then(function(ev){
+  api("/api/eval").then(renderEval).catch(function(e){
+    if(e && e.status==null && !/HTTP/.test(e.message||"")) { el.innerHTML='<h2>Evaluation</h2><div class="err">Render error: '+esc(e.message)+'</div>'; return; }
+    el.innerHTML='<h2>Evaluation</h2><div class="empty">'+(e.status===404?'No batch evaluation generated yet. Run <span class="mono">python -m atm.evaluate</span> on the server.':'Could not load evaluation ('+esc(e.message)+').')+'</div>';
+  });
+}
+function renderEval(ev){
+    var el=$("evalPanel");
     ev=obj(ev);
     var s=obj(ev.summary), b=obj(ev.baseline);
     var h='<h2><span>Batch evaluation</span><span class="muted" style="text-transform:none;letter-spacing:0">'+(ev.n!=null?esc(ev.n)+' flights':'')+(ev.policy?' · policy '+esc(ev.policy):'')+'</span></h2>';
@@ -567,7 +631,34 @@ function loadEval(){
     if(!fl.length) h+='<div class="okc" style="font-size:13px">None recorded.</div>';
     h+='<div id="failList"></div>';
     el.innerHTML=h;
-    var list=$("failList");
+    renderFailList($("failList"), fl, null);
+    var cp=ev.compare && typeof ev.compare==="object" ? ev.compare : null;
+    if(cp){
+      var cs=obj(cp.summary), cb=obj(cp.baseline), cr=obj(cp.rule_on_same_flights), pol=cp.policy||"model";
+      var keys=[]; [cr,cs,cb].forEach(function(o){ Object.keys(o).forEach(function(k){ if(typeof o[k]==="number" && keys.indexOf(k)<0) keys.push(k); }); });
+      var c='<div style="border-top:1px solid var(--line);margin-top:18px;padding-top:12px"><h2><span>Formulas vs '+esc(modeName(pol))+' on the same '+esc(cp.n!=null?cp.n:"")+' flights</span></h2>';
+      c+='<div style="display:flex;gap:24px;flex-wrap:wrap;margin:6px 0 10px">';
+      if(cp.same_final_plan_as_rule_pct!=null) c+='<div><div class="big">'+esc(num(cp.same_final_plan_as_rule_pct,1))+'%</div><div class="muted" style="font-size:12px">same final plan as formulas</div></div>';
+      if(cp.flights_with_model_errors!=null) c+='<div><div class="big">'+esc(num(cp.flights_with_model_errors,0))+'</div><div class="muted" style="font-size:12px">flights with model errors (formulas stood in)</div></div>';
+      c+='</div>';
+      if(keys.length){
+        c+='<table style="max-width:860px"><tr><th>Metric</th><th>Formulas (rule)</th><th>'+esc(modeName(pol))+'</th><th>Status quo</th></tr>';
+        keys.forEach(function(k){
+          var rv=cr[k], mv=cs[k], cls="";
+          if(typeof rv==="number" && typeof mv==="number" && Math.abs(mv-rv)>1e-9){ var lower=LOWER_BETTER.test(k) && !/protect|consensus|feasib|success/i.test(k); cls=((mv<rv)===lower)?"better":"worse"; }
+          var f=function(v){ return typeof v==="number"?num(v,2):"-"; };
+          c+='<tr><td class="mono">'+esc(k)+'</td><td>'+f(rv)+'</td><td class="'+cls+'">'+f(mv)+'</td><td>'+f(cb[k])+'</td></tr>';
+        });
+        c+='</table><div class="muted" style="font-size:11px;margin-top:3px">Green/red on the model column = better/worse than formulas on the same flights.</div>';
+      }
+      var cfl=arr(cp.failures);
+      c+='<div class="muted" style="font-size:12px;margin-top:12px">'+esc(modeName(pol))+' failures ('+cfl.length+')'+(cfl.length?' · click to replay in that mode':'')+'</div><div id="cmpFailList"></div></div>';
+      el.insertAdjacentHTML("beforeend", c);
+      renderFailList($("cmpFailList"), cfl, pol);
+    }
+}
+function renderFailList(list, fl, pol){
+    if(!list) return;
     fl.forEach(function(f){
       f=obj(f);
       var d=document.createElement("div"); d.className="fail-item";
@@ -575,16 +666,19 @@ function loadEval(){
       d.innerHTML='<span class="mono">#'+esc(f.flight_id)+' '+esc(f.callsign||"")+'</span> <span class="badc">'+esc(f.reason||"")+'</span> <span class="muted">'+esc(extra)+'</span>';
       d.addEventListener("click",function(){
         if(f.flight_id==null) return;
+        if(pol){ var r=document.querySelector('input[name=policy][value="'+pol+'"]'); if(r && !r.disabled) r.checked=true; }
         showTab("neg");
         selectFlight({id:f.flight_id, callsign:f.callsign||("#"+f.flight_id), route:f.route||"", date:f.date||""});
         setTimeout(negotiate, 50);
       });
       list.appendChild(d);
     });
-  }).catch(function(e){
-    el.innerHTML='<h2>Evaluation</h2><div class="empty">'+(e.status===404?'No batch evaluation generated yet. Run <span class="mono">python -m atm.evaluate</span> on the server.':'Could not load evaluation ('+esc(e.message)+').')+'</div>';
-  });
 }
+/* test hooks (no network) */
+window.ND={
+  showResult:function(d){ d=obj(d); state.data=d; stopAnim(); var sc=obj(d.scenario); renderFlight(state.flight||{}, sc); renderScenario(sc); buildLabels(d); $("briefBox").style.display="none"; playTimeline(d); },
+  renderEval:function(ev){ $("evalView").style.display="block"; $("negView").style.display="none"; renderEval(ev); }
+};
 })();
 </script>
 </body>
