@@ -64,7 +64,13 @@ export function WaveScreen() {
           setMessages((xs) => [...xs, m]);
           const b = m.body;
           if (b.type === "OPEN" || b.type === "MOVE" || b.type === "COUNTER") setTable(b.plan);
-          if (b.type === "MOVE_REJECTED") setRejection({ seq: m.seq, move: b.move, violations: b.violations });
+          if (b.type === "MOVE_REJECTED") {
+            const cs = b.move.callsigns[0];
+            setTable((t) => {
+              setRejection({ seq: m.seq, move: b.move, violations: b.violations, runway: t?.assignments.find((a) => a.callsign === cs)?.runway });
+              return t;
+            });
+          }
         } else if (ev.event === "result") {
           setResult(ev.data); setTable(ev.data.final_plan); setRejection(null); setStatus("done");
           if (ev.data.log) setMessages(ev.data.log);

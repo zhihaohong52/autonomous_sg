@@ -6,7 +6,7 @@ const W = 832, LABEL = 64, RIGHT = 8, LANE = 25, BAR = 18, AXIS = 22, GAP = 14;
 const SPAN = 90;                                   // T+0 … T+90 minutes
 const x = (min: number) => LABEL + (Math.max(0, Math.min(SPAN, min)) / SPAN) * (W - LABEL - RIGHT);
 
-export interface Rejection { seq: number; move: Move; violations: RuleCheck[] }
+export interface Rejection { seq: number; move: Move; violations: RuleCheck[]; runway?: string }
 
 export function Gantt({ wave, plan, rejection }: { wave: WaveScenario; plan: JointPlan | null; rejection: Rejection | null }) {
   const runways = wave.airport.runways;
@@ -22,10 +22,9 @@ export function Gantt({ wave, plan, rejection }: { wave: WaveScenario; plan: Joi
   if (rejection) {
     const p = rejection.move.params;
     const cs = rejection.move.callsigns[0];
-    const cur = plan?.assignments.find((a) => a.callsign === cs);
+    const rwy = typeof p.runway === "string" ? p.runway : rejection.runway ?? plan?.assignments.find((a) => a.callsign === cs)?.runway;
     if (typeof p.gate === "string" && gates.some((g) => g.id === p.gate)) rejY = yGate(p.gate);
-    else if (typeof p.runway === "string") rejY = yRwy(p.runway);
-    else if (cur?.runway) rejY = yRwy(cur.runway);
+    else if (rwy) rejY = yRwy(rwy);
   }
 
   return (

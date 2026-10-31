@@ -16,7 +16,9 @@ export class ApiError extends Error {
   constructor(public code: string, message: string, public status = 0) { super(message); }
 }
 
-async function get<T>(path: string, fallback: () => Promise<T>): Promise<T> {
+class NotDeployed extends Error {}
+
+async function get<T>(path: string, fallback: () => Promise<T>, valid: (x: any) => boolean = () => true): Promise<T> {
   if (offline) return fallback();
   try {
     const r = await fetch(path);
@@ -24,9 +26,13 @@ async function get<T>(path: string, fallback: () => Promise<T>): Promise<T> {
     if (!ct.includes("json")) throw new TypeError("no API");          // dev server returned index.html
     if (!r.ok) {
       const e = await r.json().catch(() => ({}));
+      // FastAPI's own {"detail": "Not Found"} means the route does not exist: wave mode is not deployed
+      if (r.status === 404 && !e?.error) throw new NotDeployed(path);
       throw new ApiError(e?.error?.code ?? String(r.status), e?.error?.message ?? r.statusText, r.status);
     }
-    return (await r.json()) as T;
+    const body = await r.json();
+    if (!valid(body)) throw new NotDeployed(path);              // e.g. the v1 /api/config shape
+    return body as T;
   } catch (e) {
     if (e instanceof ApiError) throw e;
     offline = true;
@@ -35,7 +41,7 @@ async function get<T>(path: string, fallback: () => Promise<T>): Promise<T> {
 }
 
 export const api = {
-  config: () => get<Config>("/api/config", async () => (await mock()).mockConfig),
+  config: () => get<Config>("/api/config", async () => (await mock()).mockConfig, (c) => Array.isArray(c?.modes) && Array.isArray(c?.models)),
   waves: (q = "") => get<WaveSummary[]>(`/api/waves?limit=50${q ? `&q=${encodeURIComponent(q)}` : ""}`, async () => (await mock()).mockWaves),
   randomWave: () => get<WaveSummary>("/api/waves/random", async () => (await mock()).mockWaves[0]),
   wave: (id: string) => get<WaveScenario>(`/api/wave/${encodeURIComponent(id)}`, async () => (await mock()).wave),
