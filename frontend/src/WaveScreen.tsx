@@ -20,7 +20,7 @@ export function WaveScreen() {
   const [waves, setWaves] = useState<WaveSummary[]>([]);
   const [wave, setWave] = useState<WaveScenario | null>(null);
   const [loadErr, setLoadErr] = useState<string | null>(null);
-  const [mode, setMode] = useState<Mode>("decision+claude");
+  const [mode, setMode] = useState<Mode>("decision");
   const [model, setModel] = useState("");
   const [replay, setReplay] = useState(true);
 
@@ -55,7 +55,7 @@ export function WaveScreen() {
     (async () => {
       try {
         const [c, ws] = await Promise.all([api.config(), api.waves()]);
-        setConfig(c); setMode(c.default_mode); setModel(c.default_model); setReplay(c.replay_available); setWaves(ws);
+        setConfig(c); setMode(c.default_mode === "decision+claude" ? "decision" : c.default_mode); setModel(c.default_model); setReplay(c.replay_available); setWaves(ws);
         const fromHash = location.hash.match(/#\/wave\/(.+)/)?.[1];
         const first = fromHash ?? ws[0]?.id ?? (await api.randomWave()).id;
         await loadWave(decodeURIComponent(first));
@@ -216,7 +216,7 @@ export function WaveScreen() {
           <div className="menu">
             <div className="field">Decision mode
               <div className="seg" role="group" aria-label="Decision mode">
-                {(config?.modes ?? ["formulas", "decision", "decision+claude"]).map((m) => (
+                {(config?.modes ?? ["formulas", "decision"]).filter((m) => m !== "decision+claude").map((m) => (
                   <button key={m} aria-pressed={mode === m} onClick={() => setMode(m)}>{MODE_LABEL[m]}</button>
                 ))}
               </div>

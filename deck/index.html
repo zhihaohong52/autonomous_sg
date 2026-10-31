@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js"></script>
+<style>
+:root { --ground:#0b0f14; --ink:#f4f6f8; --muted:#9aa7b4; --accent:#4da3ff; --font-display:"Inter", sans-serif; }
+* { margin:0; padding:0; box-sizing:border-box; }
+html,body { width:1920px; height:1080px; overflow:hidden; background:var(--ground); }
+#root { width:100%; height:100%; position:relative; font-family:var(--font-display); color:var(--ink); }
+.slide { position:absolute; inset:0; padding:150px 200px; display:flex; flex-direction:column; justify-content:center; }
+.slide .in { display:flex; flex-direction:column; gap:36px; }
+.title .in { align-items:center; text-align:center; }
+h1 { font-size:140px; font-weight:900; letter-spacing:-0.04em; }
+h2 { font-size:76px; font-weight:700; letter-spacing:-0.025em; line-height:1.08; max-width:1500px; }
+.kick { font-size:30px; font-weight:700; color:var(--accent); text-transform:uppercase; letter-spacing:0.08em; }
+.body { font-size:40px; line-height:1.4; color:var(--muted); max-width:1450px; }
+.sub { font-size:46px; color:var(--muted); }
+.foot { font-size:28px; color:var(--muted); }
+img { width:150px; height:150px; border-radius:28px; }
+.row { display:flex; gap:40px; }
+.card { flex:1; border:2px solid #243140; border-radius:20px; padding:44px; display:flex; flex-direction:column; gap:14px; }
+.card b { font-size:56px; } .card span { font-size:32px; color:var(--muted); }
+.stats { display:grid; grid-template-columns:repeat(3,1fr); gap:60px 70px; }
+.stats div { display:flex; flex-direction:column; gap:10px; }
+.stats b { font-size:96px; font-weight:900; color:var(--accent); letter-spacing:-0.03em; }
+.stats span { font-size:30px; color:var(--muted); line-height:1.3; }
+</style></head><body>
+<div id="root" data-composition-id="main" data-start="0" data-duration="36.0" data-width="1920" data-height="1080">
+<section id="s1" class="clip slide title" data-start="0.0" data-duration="4.5" data-track-index="0" data-track-kind="graphics"><div class="in"><img id="logo" src="assets/mark.svg" alt=""><h1>Final Approach</h1><p class="sub">Three agents agree a safe revised arrival when disruption hits</p><p class="foot">Autonomous SG 2026 · Airbus Challenge 2 · Air traffic decisions</p></div></section>
+<section id="s2" class="clip slide " data-start="4.5" data-duration="4.5" data-track-index="0" data-track-kind="graphics"><div class="in"><p class="kick">The problem</p><h2>A delayed arrival needs a new runway, slot and gate.</h2><p class="body">Today the airline duty manager phones the tower, the crew and ground handling, one call at a time. Nobody checks the combined answer against wake, fuel, crew-duty and gate rules together.</p></div></section>
+<section id="s3" class="clip slide " data-start="9.0" data-duration="4.5" data-track-index="0" data-track-kind="graphics"><div class="in"><p class="kick">How it works</p><div class="row"><div class="card"><b>ATC</b><span>runway, slot, order</span></div><div class="card"><b>PILOT</b><span>speed, ground delay, divert</span></div><div class="card"><b>GROUND</b><span>gates, remote stand</span></div></div><p class="body">One structured message per agent per turn, at most 3 turns. No agreement: a deterministic solver decides and logs why.</p></div></section>
+<section id="s4" class="clip slide " data-start="13.5" data-duration="4.5" data-track-index="0" data-track-kind="graphics"><div class="in"><p class="kick">Safety by construction</p><h2>A 12-rule engine decides legality. No model ever does.</h2><p class="body">Wake separation, runway capacity, FAA crosswind limits, fuel reserve, crew duty, gate size and availability. Every veto cites the rule, the source and the numbers.</p></div></section>
+<section id="s5" class="clip slide " data-start="18.0" data-duration="4.5" data-track-index="0" data-track-kind="graphics"><div class="in"><p class="kick">Code does the maths, the model judges</p><h2>TypeSafe jev-1.14 picks moves and votes on pre-computed verdicts.</h2><p class="body">“Fixes 2 rule breaches”, “clearly better for you”, “meets your minimum”. Consensus rose from 68–94% to 98% once raw numbers left the prompt. Claude Haiku 5.5 writes the duty-manager brief and decides nothing.</p></div></section>
+<section id="s6" class="clip slide " data-start="22.5" data-duration="4.5" data-track-index="0" data-track-kind="graphics"><div class="in"><p class="kick">Benchmark · 50 seeded flights.csv rows, 30 hubs</p><div class="stats"><div><b>0</b><span>rule violations in any final plan</span></div><div><b>16/50</b><span>waves where the status quo breaks a rule</span></div><div><b>98%</b><span>consensus with jev-1.14, 1.32 turns</span></div><div><b>1.4 min</b><span>from a centralised optimiser</span></div><div><b>32%</b><span>illegal plans with the engine off</span></div><div><b>20/20</b><span>resolved with the primary model dead</span></div></div></div></section>
+<section id="s7" class="clip slide " data-start="27.0" data-duration="4.5" data-track-index="0" data-track-kind="graphics"><div class="in"><p class="kick">Honest about the data</p><h2>Flights, delays, runways, weather and gates are real.</h2><p class="body">DOT 2015 flights.csv, OurAirports runways, IEM METAR, OpenStreetMap gates. Gate occupancy, fuel, crew shifts and connections are simulated and badged. Every limit used is returned with its source.</p></div></section>
+<section id="s8" class="clip slide title" data-start="31.5" data-duration="4.5" data-track-index="0" data-track-kind="graphics"><div class="in"><img id="logo2" src="assets/mark.svg" alt=""><h1>Final Approach</h1><p class="sub">disruption-negotiator.onrender.com</p><p class="foot">github.com/zhihaohong52/final_approach · MIT</p></div></section>
+</div>
+<script>
+const tl = gsap.timeline({ paused: true });
+tl.fromTo("#s1 .in > *", { opacity:0, y:40 }, { opacity:1, y:0, duration:0.6, ease:"power3.out", stagger:0.12 }, 0.1);
+tl.to("#s1 .in", { opacity:0, duration:0.35, ease:"power2.in" }, 4.05);
+tl.fromTo("#s2 .in > *", { opacity:0, y:40 }, { opacity:1, y:0, duration:0.6, ease:"power3.out", stagger:0.12 }, 4.6);
+tl.to("#s2 .in", { opacity:0, duration:0.35, ease:"power2.in" }, 8.55);
+tl.fromTo("#s3 .in > *", { opacity:0, y:40 }, { opacity:1, y:0, duration:0.6, ease:"power3.out", stagger:0.12 }, 9.1);
+tl.to("#s3 .in", { opacity:0, duration:0.35, ease:"power2.in" }, 13.05);
+tl.fromTo("#s4 .in > *", { opacity:0, y:40 }, { opacity:1, y:0, duration:0.6, ease:"power3.out", stagger:0.12 }, 13.6);
+tl.to("#s4 .in", { opacity:0, duration:0.35, ease:"power2.in" }, 17.55);
+tl.fromTo("#s5 .in > *", { opacity:0, y:40 }, { opacity:1, y:0, duration:0.6, ease:"power3.out", stagger:0.12 }, 18.1);
+tl.to("#s5 .in", { opacity:0, duration:0.35, ease:"power2.in" }, 22.05);
+tl.fromTo("#s6 .in > *", { opacity:0, y:40 }, { opacity:1, y:0, duration:0.6, ease:"power3.out", stagger:0.12 }, 22.6);
+tl.to("#s6 .in", { opacity:0, duration:0.35, ease:"power2.in" }, 26.55);
+tl.fromTo("#s7 .in > *", { opacity:0, y:40 }, { opacity:1, y:0, duration:0.6, ease:"power3.out", stagger:0.12 }, 27.1);
+tl.to("#s7 .in", { opacity:0, duration:0.35, ease:"power2.in" }, 31.05);
+tl.fromTo("#s8 .in > *", { opacity:0, y:40 }, { opacity:1, y:0, duration:0.6, ease:"power3.out", stagger:0.12 }, 31.6);
+window.__timelines["main"] = tl;
+tl.seek(0);
+</script>
+</body></html>

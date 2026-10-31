@@ -234,6 +234,7 @@ Run: `python3 -m atm.wave.benchmark --source flights2015 --n 50 --arms openroute
 - **Status quo:** it breaks at least one rule on 16 of 50 waves. On the 34 waves where it is legal, the negotiated plans are also faster: 337.2 min (formulas) and 337.5 min (jev-1.14) against 339.2 min for the status quo.
 - **Safety:** 0 rule violations in any final plan, every arm. **Engine-off ablation:** 32% of the agents' final plans break a rule when the engine is disabled.
 - **Outage test:** primary model replaced by a dead endpoint on 20 waves; 20/20 resolved with a legal plan.
+- **At scale (1,000 rows, `eval/BENCHMARK_1000.md`):** jev-1.14 reaches 99.5% consensus in 1.20 turns with 329.8 ± 10.6 min mean total delay, against 329.3 ± 10.6 for the formulas, with the same outcome on 100% of the 999 waves.
 - Full report: `eval/BENCHMARK.md`, raw data `eval/benchmark.json`.
 <!-- /BENCHMARK -->
 
