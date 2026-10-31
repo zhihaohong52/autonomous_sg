@@ -1,0 +1,141 @@
+{
+ "n": 500,
+ "policy": "rule",
+ "population": 11914,
+ "seed": 7,
+ "summary": {
+  "consensus_rate_pct": 84.6,
+  "fallback_rate_pct": 15.4,
+  "mean_rounds": 1.87,
+  "agreed_in_round": {
+   "1": 163,
+   "2": 239,
+   "3": 21
+  },
+  "final_plans_violating_a_rule": 0,
+  "engine_rejections_per_flight": 7.59,
+  "round1_violations_by_rule": {
+   "GND-GATE-FREE": 2091,
+   "ATC-WAKE-SEP": 2004,
+   "PLT-FUEL-RESERVE": 390,
+   "ATC-RWY-OPEN": 148,
+   "GND-GATE-SIZE": 99,
+   "ATC-TAXI-ROUTE": 56
+  },
+  "ablation_no_engine_unsafe_agreements_pct": 97.6,
+  "ablation_rules": {
+   "ATC-WAKE-SEP": 314,
+   "GND-GATE-FREE": 311,
+   "ATC-RWY-OPEN": 65,
+   "GND-GATE-SIZE": 15,
+   "ATC-TAXI-ROUTE": 1
+  },
+  "fairness_vs_central_optimum": 1.0,
+  "mean_latency_s": 0.14,
+  "delay_min": 12.52,
+  "fuel_kg": 108.29,
+  "hold_min": 4.35,
+  "connections_protected_pct": 90.7,
+  "crew_overtime_min": 0.17,
+  "next_departure_delay_min": 4.96,
+  "diversion_pct": 2.0,
+  "crew_duty_breaches": 0
+ },
+ "baseline": {
+  "delay_min": 41.55,
+  "fuel_kg": 142.3,
+  "hold_min": 5.22,
+  "connections_protected_pct": 64.0,
+  "crew_overtime_min": 2.77,
+  "next_departure_delay_min": 9.45,
+  "diversion_pct": 3.0,
+  "crew_duty_breaches": 1
+ },
+ "failures": [
+  {
+   "flight_id": 1186,
+   "callsign": "OO5594",
+   "route": "PSC->SFO",
+   "plan": "Land R2 at T+10, gate B2",
+   "reason": "burns more fuel than baseline (56 vs 2 kg)"
+  },
+  {
+   "flight_id": 1144,
+   "callsign": "HA251",
+   "route": "ITO->HNL",
+   "plan": "Land R2 at T+9, gate B2",
+   "reason": "burns more fuel than baseline (140 vs 26 kg)"
+  },
+  {
+   "flight_id": 1486,
+   "callsign": "DL324",
+   "route": "ATL->PDX",
+   "plan": "Land R1 at T+19, gate A5",
+   "reason": "no consensus in 3 rounds -> deterministic fallback; burns more fuel than baseline (1244 vs 294 kg)"
+  },
+  {
+   "flight_id": 2028,
+   "callsign": "UA334",
+   "route": "EWR->IAD",
+   "plan": "Land R1 at T+19, gate A1",
+   "reason": "no consensus in 3 rounds -> deterministic fallback"
+  },
+  {
+   "flight_id": 10332,
+   "callsign": "DL1390",
+   "route": "ORD->LGA",
+   "plan": "Land R1 at T+19, gate A5",
+   "reason": "no consensus in 3 rounds -> deterministic fallback; burns more fuel than baseline (564 vs 47 kg)"
+  },
+  {
+   "flight_id": 4744,
+   "callsign": "AA544",
+   "route": "DCA->TPA",
+   "plan": "Land R1 at T+21, gate RS",
+   "reason": "no consensus in 3 rounds -> deterministic fallback"
+  },
+  {
+   "flight_id": 5054,
+   "callsign": "DL2004",
+   "route": "LAX->DEN",
+   "plan": "Land R2 at T+15, gate B3",
+   "reason": "burns more fuel than baseline (292 vs 9 kg)"
+  },
+  {
+   "flight_id": 11173,
+   "callsign": "WN2037",
+   "route": "CLE->STL",
+   "plan": "Land R1 at T+14, gate RS",
+   "reason": "no consensus in 3 rounds -> deterministic fallback"
+  },
+  {
+   "flight_id": 1688,
+   "callsign": "WN1713",
+   "route": "DEN->LBB",
+   "plan": "Land R1 at T+13, gate A1",
+   "reason": "no consensus in 3 rounds -> deterministic fallback"
+  },
+  {
+   "flight_id": 9528,
+   "callsign": "AA1106",
+   "route": "DFW->ORD",
+   "plan": "Land R2 at T+5, gate RS",
+   "reason": "no consensus in 3 rounds -> deterministic fallback"
+  },
+  {
+   "flight_id": 3078,
+   "callsign": "UA1508",
+   "route": "EWR->MCO",
+   "plan": "Land R1 at T+4, gate RS",
+   "reason": "no consensus in 3 rounds -> deterministic fallback"
+  },
+  {
+   "flight_id": 6101,
+   "callsign": "WN887",
+   "route": "LAX->SJC",
+   "plan": "Land R2 at T+5, gate RS",
+   "reason": "no consensus in 3 rounds -> deterministic fallback"
+  }
+ ],
+ "runtime_s": 131.0
+}

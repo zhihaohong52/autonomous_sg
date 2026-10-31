@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Disruption Negotiator</title>
+<link rel="icon" href="data:,">
+<style>
+:root{
+  --bg:#0b0f14;--panel:#121820;--panel2:#18202b;--line:#253041;--text:#e6edf3;--muted:#8b98a8;
+  --atc:#4ea1ff;--pilot:#ffb547;--ground:#3ddc84;--engine:#cfd6de;
+  --ok:#3ddc84;--bad:#ff5a5f;--warn:#ffb547;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font:15px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+button,input,select{font:inherit;color:inherit}
+header{display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid var(--line);background:#0e141b}
+h1{margin:0;font-size:22px;letter-spacing:.3px}
+.sub{color:var(--muted);font-size:13px}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.search{position:relative}
+.search input{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:7px 10px;width:220px}
+.search .list{position:absolute;top:38px;left:0;width:340px;max-height:360px;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:6px;z-index:20;display:none}
+.search .list div{padding:6px 10px;cursor:pointer;font-family:var(--mono);font-size:13px;border-bottom:1px solid #1b2430}
+.search .list div:hover{background:var(--panel2)}
+.btn{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:7px 12px;cursor:pointer}
+.btn:hover:not(:disabled){border-color:#3a4a60}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.primary{background:#1f6feb;border-color:#1f6feb;font-weight:600}
+.btn.ok{background:#14532d;border-color:#22c55e}
+.btn.bad{background:#5a1a1d;border-color:var(--bad)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg label{padding:7px 10px;cursor:pointer;background:var(--panel2);font-size:13px}
+.seg input{display:none}
+.seg input:checked+span{color:#fff}
+.seg label:has(input:checked){background:#1f3a5f}
+.seg label.disabled{opacity:.4;cursor:not-allowed}
+nav.tabs{display:flex;gap:4px;padding:0 18px;border-bottom:1px solid var(--line);background:#0e141b}
+nav.tabs button{background:none;border:none;border-bottom:2px solid transparent;padding:8px 14px;cursor:pointer;color:var(--muted)}
+nav.tabs button.active{color:var(--text);border-bottom-color:#1f6feb}
+main{display:grid;grid-template-columns:minmax(260px,1fr) minmax(420px,1.7fr) minmax(320px,1.2fr);gap:12px;padding:12px 18px}
+@media(max-width:1100px){main{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-bottom:12px}
+.panel h2{margin:0 0 8px;font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);display:flex;justify-content:space-between;align-items:center;gap:8px}
+.big{font-size:26px;font-weight:700;font-family:var(--mono)}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:14px}
+.kv dt{color:var(--muted)}
+.kv dd{margin:0}
+.tag{display:inline-block;font-size:11px;padding:1px 6px;border-radius:4px;border:1px solid var(--line);color:var(--muted);vertical-align:middle}
+.tag.real{border-color:#2f7d4f;color:#7ee2a8}
+.tag.synth{border-color:#9a6a12;color:#ffcf7a;background:#2a1e05}
+.synthbox{border:1px dashed #9a6a12;background:#1c1505;border-radius:6px;padding:6px 8px;font-size:12px;color:#ffd894;margin-bottom:8px}
+ul.plain{margin:4px 0;padding-left:18px}
+.mono{font-family:var(--mono)}
+.muted{color:var(--muted)}
+.okc{color:var(--ok)} .badc{color:var(--bad)}
+#timeline{min-height:300px}
+.round{margin-bottom:14px}
+.round>.rh{font-size:12px;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);border-bottom:1px solid var(--line);padding-bottom:3px;margin-bottom:6px}
+.msg{border-left:4px solid var(--engine);background:var(--panel2);border-radius:4px;padding:7px 10px;margin:5px 0;animation:fadein .25s ease}
+@keyframes fadein{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.msg .who{font-weight:700;font-size:12px;letter-spacing:1px;margin-right:6px}
+.msg .typ{font-size:11px;color:var(--muted);font-family:var(--mono)}
+.msg .rat{color:var(--muted);font-size:12px;margin-top:3px;font-style:italic}
+.s-ATC{border-left-color:var(--atc)} .s-ATC .who{color:var(--atc)}
+.s-PILOT{border-left-color:var(--pilot)} .s-PILOT .who{color:var(--pilot)}
+.s-GROUND{border-left-color:var(--ground)} .s-GROUND .who{color:var(--ground)}
+.s-ENGINE{border-left-color:var(--engine)} .s-ENGINE .who{color:var(--engine)}
+.msg.fail{border-left-color:var(--bad);background:#2a1215;border:1px solid #6b2226;border-left-width:4px}
+.msg.fail .head{color:#ffb3b5;font-weight:600}
+.msg.passsum{border-left-color:var(--ok);background:#0f2218;color:#9ff0c0}
+.viol{font-family:var(--mono);font-size:13px;margin-top:3px}
+.viol b{color:var(--bad)}
+.plan-line{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:4px;font-size:14px}
+.chip{font-family:var(--mono);font-size:11px;padding:1px 5px;border-radius:3px;background:#0b0f14;border:1px solid var(--line)}
+.chip.ATC{color:var(--atc)} .chip.PILOT{color:var(--pilot)} .chip.GROUND{color:var(--ground)}
+.vote{display:flex;gap:8px;font-size:13px;margin-top:2px}
+.vote .d{font-weight:700;width:62px;font-family:var(--mono)}
+.vote .d.ACCEPT{color:var(--ok)} .vote .d.REJECT{color:var(--bad)}
+.banner{border-radius:6px;padding:10px 12px;margin:8px 0;font-weight:600;animation:fadein .3s ease}
+.banner.cons{background:#0f3020;border:1px solid var(--ok);color:#b9f5d0}
+.banner.nocons{background:#2a2108;border:1px solid var(--warn);color:#ffe0a3}
+.banner.fb{background:#2a1a3a;border:1px solid #b07cff;color:#e2cfff}
+.outcome{display:inline-block;padding:3px 8px;border-radius:4px;font-size:12px;font-weight:700}
+.outcome.cons{background:#0f3020;color:#7ee2a8;border:1px solid var(--ok)}
+.outcome.fb{background:#2a1a3a;color:#d6b8ff;border:1px solid #b07cff}
+.bar{display:grid;grid-template-columns:70px 1fr 48px;gap:8px;align-items:center;margin:4px 0;font-size:13px}
+.bar .track{height:12px;background:#0b0f14;border:1px solid var(--line);border-radius:3px;overflow:hidden}
+.bar .fill{height:100%;transition:width .6s ease}
+.checks{list-style:none;padding:0;margin:0;font-size:13px}
+.checks li{display:grid;grid-template-columns:18px 140px 1fr;gap:6px;padding:3px 0;border-bottom:1px solid #1b2430}
+.checks .rule{font-family:var(--mono);font-size:12px}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:4px 6px;border-bottom:1px solid #1b2430;text-align:right}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--muted);font-weight:500}
+td.better{color:var(--ok);font-weight:600}
+td.worse{color:var(--bad);font-weight:600}
+.decision textarea{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:6px;min-height:52px;margin-top:6px;color:var(--text)}
+.confirm{margin-top:8px;font-size:13px;color:#9ff0c0;font-family:var(--mono)}
+.err{color:var(--bad);font-size:13px}
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid #345;border-top-color:#4ea1ff;border-radius:50%;animation:spin 1s linear infinite;vertical-align:middle;margin-right:6px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.empty{color:var(--muted);text-align:center;padding:40px 10px}
+footer{padding:10px 18px 18px;color:var(--muted);font-size:12px;border-top:1px solid var(--line)}
+#evalView{padding:12px 18px;display:none}
+.fail-item{cursor:pointer;padding:6px 8px;border-bottom:1px solid #1b2430;font-size:13px}
+.fail-item:hover{background:var(--panel2)}
+.legend{display:flex;gap:10px;font-size:12px}
+.legend span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px;background:currentColor}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Disruption Negotiator</h1>
+    <div class="sub">ATC · Pilot · Ground agents, deterministic safety engine, human approves</div>
+  </div>
+  <div class="controls">
+    <div class="search">
+      <input id="q" placeholder="Search airport (ATL) or callsign" autocomplete="off">
+      <div class="list" id="qlist"></div>
+    </div>
+    <button class="btn" id="btnRandom">Random disrupted flight</button>
+    <div class="seg" id="policySeg">
+      <label><input type="radio" name="policy" value="rule" checked><span>Decision models only</span></label>
+      <label id="llmLabel" title=""><input type="radio" name="policy" value="llm"><span>LLM agents</span></label>
+    </div>
+    <button class="btn primary" id="btnNeg" disabled>Negotiate</button>
+  </div>
+</header>
+<nav class="tabs">
+  <button class="active" data-tab="neg">Negotiation</button>
+  <button data-tab="eval">Evaluation</button>
+  <span class="muted" id="cfgInfo" style="margin-left:auto;align-self:center;font-size:12px"></span>
+</nav>
+
+<main id="negView">
+  <section>
+    <div class="panel" id="flightPanel"><h2>Flight</h2><div class="empty">Pick a disrupted flight to begin.</div></div>
+    <div class="panel" id="scenarioPanel"><h2>Scenario</h2><div class="empty">No scenario loaded.</div></div>
+  </section>
+  <section>
+    <div class="panel">
+      <h2><span>Negotiation timeline</span>
+        <span class="legend"><span style="color:var(--atc)">ATC</span><span style="color:var(--pilot)">PILOT</span><span style="color:var(--ground)">GROUND</span><span style="color:var(--engine)">ENGINE</span>
+        <button class="btn" id="btnSkip" style="padding:2px 8px;font-size:12px;display:none">Skip animation</button></span>
+      </h2>
+      <div id="timeline"><div class="empty">The negotiation between agents will play out here.</div></div>
+    </div>
+  </section>
+  <section>
+    <div class="panel decision" id="decisionPanel"><h2>Decision</h2><div class="empty">Awaiting negotiation.</div></div>
+  </section>
+</main>
+
+<section id="evalView"><div class="panel" id="evalPanel"><h2>Evaluation</h2><div class="empty">Loading...</div></div></section>
+
+<footer>Airport state around each real flight is simulated; rules and scores are deterministic and reproducible per flight id. Real flight fields come from US DOT / BTS on-time data.</footer>
+
+<script>
+(function(){
+"use strict";
+var $ = function(id){ return document.getElementById(id); };
+var AGENTS = ["ATC","PILOT","GROUND"];
+var COLORS = {ATC:"var(--atc)",PILOT:"var(--pilot)",GROUND:"var(--ground)"};
+var state = {cfg:null, flight:null, data:null, labels:{}, animTimer:null, animQueue:[], decided:false};
+
+function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];}); }
+function num(v,d){ if(v==null||v===""||isNaN(Number(v))) return "-"; var n=Number(v); return d==null? (Math.round(n*10)/10).toString() : n.toFixed(d); }
+function arr(x){ return Array.isArray(x)?x:[]; }
+function obj(x){ return x && typeof x==="object" ? x : {}; }
+function tmin(v){ if(v==null||isNaN(Number(v))) return "-"; var n=Number(v); return "T"+(n>=0?"+":"")+num(n); }
+
+function api(path, opts){
+  return fetch(path, opts).then(function(r){
+    if(!r.ok){ var e=new Error("HTTP "+r.status); e.status=r.status; throw e; }
+    return r.json();
+  });
+}
+function post(path, body){ return api(path,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}); }
+
+/* ---------- config ---------- */
+api("/api/config").then(function(c){
+  state.cfg=c;
+  $("cfgInfo").textContent = (c.n_disruptions!=null? c.n_disruptions+" real disrupted flights" : "") + (c.model? " · LLM model: "+c.model : "");
+  if(!c.llm_available){
+    var l=$("llmLabel"); l.classList.add("disabled"); l.title="LLM agents unavailable: no API key configured on the server";
+    l.querySelector("input").disabled=true;
+  }
+}).catch(function(){ $("cfgInfo").textContent="config unavailable"; });
+
+function policy(){ var r=document.querySelector('input[name=policy]:checked'); return r?r.value:"rule"; }
+
+/* ---------- tabs ---------- */
+Array.prototype.forEach.call(document.querySelectorAll("nav.tabs button"),function(b){
+  b.addEventListener("click",function(){ showTab(b.getAttribute("data-tab")); });
+});
+function showTab(t){
+  Array.prototype.forEach.call(document.querySelectorAll("nav.tabs button"),function(b){ b.classList.toggle("active", b.getAttribute("data-tab")===t); });
+  $("negView").style.display = t==="neg" ? "" : "none";
+  $("evalView").style.display = t==="eval" ? "block" : "none";
+  if(t==="eval") loadEval();
+}
+
+/* ---------- search / select ---------- */
+var qTimer=null;
+$("q").addEventListener("input",function(){
+  clearTimeout(qTimer);
+  var v=this.value.trim();
+  qTimer=setTimeout(function(){ search(v); },200);
+});
+$("q").addEventListener("focus",function(){ search(this.value.trim()); });
+document.addEventListener("click",function(e){ if(!e.target.closest(".search")) $("qlist").style.display="none"; });
+function search(q){
+  api("/api/disruptions?limit=50&q="+encodeURIComponent(q)).then(function(list){
+    var el=$("qlist"); list=arr(list);
+    el.innerHTML = list.length? "" : '<div class="muted">No matches</div>';
+    list.forEach(function(f){
+      var d=document.createElement("div");
+      d.innerHTML = esc(f.callsign)+" &nbsp;"+esc(f.route)+" &nbsp;<span class='muted'>"+esc(f.date)+" · late-ac "+num(f.late_aircraft_delay,0)+"m · wx "+num(f.weather_delay,0)+"m</span>";
+      d.addEventListener("click",function(){ el.style.display="none"; selectFlight(f); });
+      el.appendChild(d);
+    });
+    el.style.display="block";
+  }).catch(function(){ $("qlist").innerHTML='<div class="err">Search failed</div>'; $("qlist").style.display="block"; });
+}
+$("btnRandom").addEventListener("click",function(){
+  api("/api/random").then(selectFlight).catch(function(e){ $("flightPanel").innerHTML='<h2>Flight</h2><div class="err">Could not fetch a random flight ('+esc(e.message)+')</div>'; });
+});
+
+function selectFlight(f){
+  if(!f || f.id==null) return;
+  state.flight=f; state.data=null; stopAnim();
+  $("btnNeg").disabled=false;
+  renderFlight(f, null);
+  $("timeline").innerHTML='<div class="empty">Ready. Press <b>Negotiate</b> to let ATC, Pilot and Ground agents negotiate.</div>';
+  $("decisionPanel").innerHTML='<h2>Decision</h2><div class="empty">Awaiting negotiation.</div>';
+  $("scenarioPanel").innerHTML='<h2>Scenario</h2><div class="muted"><span class="spinner"></span>Building scenario...</div>';
+  api("/api/scenario/"+encodeURIComponent(f.id)).then(function(sc){
+    if(state.flight!==f) return;
+    renderFlight(f, sc); renderScenario(sc);
+  }).catch(function(){ $("scenarioPanel").innerHTML='<h2>Scenario</h2><div class="muted">Scenario will appear after negotiation.</div>'; });
+}
+
+/* ---------- flight + scenario ---------- */
+function renderFlight(sum, sc){
+  sc=obj(sc); var fl=obj(sc.flight); sum=obj(sum);
+  var callsign = sc.callsign || sum.callsign || "-";
+  var route = (fl.origin && fl.dest) ? fl.origin+" → "+fl.dest : String(sum.route||"-").replace("->"," → ");
+  var date = sum.date || (fl.year? fl.year+"-"+String(fl.month).padStart(2,"0")+"-"+String(fl.day).padStart(2,"0") : "-");
+  var wx = fl.weather_delay!=null? fl.weather_delay : sum.weather_delay;
+  var la = fl.late_aircraft_delay!=null? fl.late_aircraft_delay : sum.late_aircraft_delay;
+  var h='<h2><span>Flight</span><span class="tag real">real flight · DOT/BTS</span></h2>';
+  h+='<div class="big">'+esc(callsign)+'</div>';
+  h+='<div style="font-size:18px;margin-bottom:6px">'+esc(route)+'</div><dl class="kv">';
+  if(fl.airline) h+='<dt>Airline</dt><dd>'+esc(fl.airline)+'</dd>';
+  h+='<dt>Date</dt><dd>'+esc(date)+'</dd>';
+  if(fl.tail) h+='<dt>Tail</dt><dd class="mono">'+esc(fl.tail)+'</dd>';
+  if(sc.wake) h+='<dt>Wake / gate</dt><dd>'+esc(sc.wake)+' / '+esc(sc.gate_size||"-")+'</dd>';
+  if(fl.arr_delay!=null) h+='<dt>Arrival delay</dt><dd>'+num(fl.arr_delay,0)+' min <span class="tag real">from DOT data</span></dd>';
+  h+='<dt>Weather delay</dt><dd>'+num(wx,0)+' min <span class="tag real">from DOT data</span></dd>';
+  h+='<dt>Late aircraft</dt><dd>'+num(la,0)+' min <span class="tag real">from DOT data</span></dd>';
+  if(fl.nas_delay!=null) h+='<dt>NAS delay</dt><dd>'+num(fl.nas_delay,0)+' min <span class="tag real">from DOT data</span></dd>';
+  if(fl.dest_wind_kmh!=null) h+='<dt>Dest. weather</dt><dd>wind '+num(fl.dest_wind_kmh)+' km/h, gust '+num(fl.dest_gust_kmh)+', precip '+num(fl.dest_precip_mm)+' mm</dd>';
+  h+='</dl>';
+  $("flightPanel").innerHTML=h;
+}
+
+function renderScenario(sc){
+  sc=obj(sc);
+  var h='<h2><span>Scenario</span><span class="tag synth">synthetic airport state</span></h2>';
+  var sf=arr(sc.synthetic_fields);
+  h+='<div class="synthbox"><b>Synthetic airport state</b> (simulated around the real flight): '+(sf.length? esc(sf.join(", ")) : "runways, gates, crew, fuel, connections")+'</div>';
+  var dis=arr(sc.disruption);
+  if(dis.length){ h+='<div class="muted" style="font-size:12px">Disruption</div><ul class="plain">'+dis.map(function(d){return '<li>'+esc(d)+'</li>';}).join("")+'</ul>'; }
+  h+='<dl class="kv">';
+  var rw=obj(sc.runways), rwk=Object.keys(rw);
+  if(rwk.length){
+    h+='<dt>Runways</dt><dd>'+rwk.map(function(k){var r=obj(rw[k]); return r.open? '<span class="okc">'+esc(k)+' open</span>' : '<span class="badc">'+esc(k)+' CLOSED</span>'+(r.reason?' <span class="muted">('+esc(r.reason)+')</span>':'');}).join(", ")+'</dd>';
+  }
+  var bt=sc.blocked_taxiway;
+  h+='<dt>Taxiway</dt><dd>'+(bt? '<span class="badc">'+esc(bt.id)+' blocked</span> <span class="muted">'+esc(bt.reason||"")+(arr(bt.cuts).length?' · cuts '+esc(bt.cuts.join(" ↔ ")):"")+'</span>' : '<span class="okc">none blocked</span>')+'</dd>';
+  var w=obj(sc.weather);
+  if(w.separation_factor!=null) h+='<dt>Separation</dt><dd>x'+num(w.separation_factor,2)+' (weather severity '+num(w.severity,2)+')</dd>';
+  var fu=obj(sc.fuel);
+  if(fu.extra_min!=null) h+='<dt>Fuel</dt><dd>'+num(fu.extra_min,0)+' min extra · alternate <b class="mono">'+esc(fu.alternate||"-")+'</b> ('+num(fu.alternate_min,0)+' min) · '+num(fu.final_reserve_min,0)+' min final reserve</dd>';
+  if(sc.eta_earliest!=null) h+='<dt>Earliest ETA</dt><dd class="mono">'+tmin(sc.eta_earliest)+'</dd>';
+  if(sc.scheduled_gate) h+='<dt>Sched. gate</dt><dd class="mono">'+esc(sc.scheduled_gate)+'</dd>';
+  if(sc.crew_shift_end!=null) h+='<dt>Crew shift end</dt><dd class="mono">'+tmin(sc.crew_shift_end)+(sc.crew_max_overtime!=null?' <span class="muted">(max '+num(sc.crew_max_overtime,0)+' min OT)</span>':'')+'</dd>';
+  if(sc.next_departure!=null) h+='<dt>Next departure</dt><dd class="mono">'+tmin(sc.next_departure)+'</dd>';
+  h+='</dl>';
+  var cn=arr(sc.connections);
+  if(cn.length){
+    var tot=cn.reduce(function(a,c){return a+(Number(c.pax)||0);},0);
+    h+='<div class="muted" style="font-size:12px;margin-top:6px">Connections ('+tot+' pax)</div><table><tr><th>Flight</th><th>Pax</th><th>Departs</th></tr>';
+    cn.slice().sort(function(a,b){return (a.departs||0)-(b.departs||0);}).forEach(function(c){ h+='<tr><td class="mono">'+esc(c.flight)+'</td><td>'+esc(c.pax)+'</td><td class="mono">'+tmin(c.departs)+'</td></tr>'; });
+    h+='</table>';
+  }
+  var ar=arr(sc.arrivals);
+  if(ar.length) h+='<div class="muted" style="font-size:12px;margin-top:6px">'+ar.length+' other arrivals in the runway queue</div>';
+  $("scenarioPanel").innerHTML=h;
+}
+
+/* ---------- negotiate ---------- */
+$("btnNeg").addEventListener("click",negotiate);
+function negotiate(){
+  if(!state.flight) return;
+  var pol=policy(); stopAnim(); state.decided=false;
+  $("btnNeg").disabled=true; $("btnRandom").disabled=true;
+  var t0=Date.now();
+  var msg = pol==="llm" ? "LLM agents are negotiating (typically 20-60 s)..." : "Decision models are negotiating...";
+  $("timeline").innerHTML='<div class="empty"><span class="spinner"></span>'+esc(msg)+' <span id="elapsed" class="mono">0s</span></div>';
+  $("decisionPanel").innerHTML='<h2>Decision</h2><div class="empty">Negotiation in progress...</div>';
+  var tick=setInterval(function(){ var e=$("elapsed"); if(e) e.textContent=Math.round((Date.now()-t0)/1000)+"s"; },500);
+  post("/api/negotiate",{flight_id:state.flight.id, policy:pol}).then(function(d){
+    clearInterval(tick);
+    state.data=obj(d);
+    var sc=obj(d.scenario);
+    renderFlight(state.flight, sc); renderScenario(sc);
+    buildLabels(d);
+    playTimeline(d);
+  }).catch(function(e){
+    clearInterval(tick);
+    $("timeline").innerHTML='<div class="err">Negotiation failed: '+esc(e.message)+'</div>';
+    $("decisionPanel").innerHTML='<h2>Decision</h2><div class="empty">No result.</div>';
+  }).then(function(){ $("btnNeg").disabled=false; $("btnRandom").disabled=false; });
+}
+
+function buildLabels(d){
+  state.labels={};
+  var res=obj(obj(d).result);
+  arr(res.log).forEach(function(m){
+    arr(obj(m.body).plans).forEach(function(p){ p=obj(p); var id=obj(p.plan).id; if(id) state.labels[id]=p.label||id; });
+  });
+  var fp=obj(res.plan); if(obj(fp.plan).id) state.labels[fp.plan.id]=fp.label||fp.plan.id;
+}
+function lbl(id){ return state.labels[id] || id || "?"; }
+
+/* Build render items from the log: groups passed CHECKs per round into one line. */
+function buildItems(res){
+  var log=arr(res.log), items=[], byRound={};
+  log.forEach(function(m){ m=obj(m); var r=m.round==null?0:m.round; (byRound[r]=byRound[r]||[]).push(m); });
+  Object.keys(byRound).sort(function(a,b){return a-b;}).forEach(function(r){
+    items.push({kind:"round", round:r});
+    var msgs=byRound[r], passed=[];
+    msgs.forEach(function(m){
+      if(m.type==="CHECK" && obj(m.body).passed){ passed.push(m); }
+      else {
+        if(m.type!=="CHECK" && passed.length){ items.push({kind:"passsum", list:passed}); passed=[]; }
+        items.push({kind:"msg", m:m});
+      }
+    });
+    if(passed.length) items.push({kind:"passsum", list:passed});
+  });
+  return items;
+}
+
+function stopAnim(){ if(state.animTimer){ clearTimeout(state.animTimer); state.animTimer=null; } $("btnSkip").style.display="none"; }
+
+function playTimeline(d){
+  var res=obj(d.result), tl=$("timeline");
+  tl.innerHTML="";
+  var head=document.createElement("div"); head.className="muted"; head.style.fontSize="12px"; head.style.marginBottom="8px";
+  head.textContent="Policy: "+(res.policy==="llm"?"LLM agents":"decision models")+(res.elapsed_s!=null?" · computed in "+num(res.elapsed_s,2)+" s":"")+" · "+arr(res.log).length+" messages";
+  tl.appendChild(head);
+  if(arr(res.llm_errors).length){
+    var le=document.createElement("div"); le.className="banner nocons";
+    le.innerHTML="LLM errors ("+res.llm_errors.length+"), agents fell back to decision models where needed: <span class='mono' style='font-weight:400'>"+esc(res.llm_errors.slice(0,3).map(function(x){return typeof x==="string"?x:JSON.stringify(x);}).join(" | "))+"</span>";
+    tl.appendChild(le);
+  }
+  var items=buildItems(res), i=0, roundEl=tl;
+  state.animQueue=items;
+  function step(){
+    if(i>=items.length){ stopAnim(); renderDecision(d); return; }
+    var it=items[i++];
+    if(it.kind==="round"){
+      roundEl=document.createElement("div"); roundEl.className="round";
+      roundEl.innerHTML='<div class="rh">Round '+esc(it.round)+'</div>'; tl.appendChild(roundEl);
+    } else {
+      var el=renderItem(it); if(el){ roundEl.appendChild(el); try{ el.scrollIntoView({block:"nearest",behavior:"smooth"}); }catch(e){} }
+    }
+    tl.scrollTop=tl.scrollHeight;
+    state.animTimer=setTimeout(step, it.kind==="round"?150:250);
+  }
+  $("btnSkip").style.display="";
+  $("btnSkip").onclick=function(){
+    clearTimeout(state.animTimer);
+    while(i<items.length){
+      var it=items[i++];
+      if(it.kind==="round"){ roundEl=document.createElement("div"); roundEl.className="round"; roundEl.innerHTML='<div class="rh">Round '+esc(it.round)+'</div>'; tl.appendChild(roundEl); }
+      else { var el=renderItem(it); if(el){ el.style.animation="none"; roundEl.appendChild(el); } }
+    }
+    stopAnim(); renderDecision(d);
+  };
+  step();
+}
+
+function utilChips(u){
+  u=obj(u);
+  return AGENTS.filter(function(a){return u[a]!=null;}).map(function(a){ return '<span class="chip '+a+'">'+a[0]+' '+num(u[a],2)+'</span>'; }).join("");
+}
+
+function renderItem(it){
+  var el=document.createElement("div");
+  if(it.kind==="passsum"){
+    var nRules=0; it.list.forEach(function(m){ nRules=Math.max(nRules, arr(obj(m.body).checks).length); });
+    el.className="msg passsum";
+    el.innerHTML='<span class="who" style="color:var(--ok)">ENGINE</span> ✓ '+it.list.length+' plan'+(it.list.length>1?'s':'')+' passed all '+(nRules||"")+' rules <span class="muted" style="font-size:12px">('+esc(it.list.map(function(m){return lbl(m.body.plan_id);}).join("; "))+')</span>';
+    return el;
+  }
+  var m=it.m, b=obj(m.body), s=m.sender||"ENGINE";
+  el.className="msg s-"+s;
+  var h='<span class="who">'+esc(s)+'</span><span class="typ">'+esc(m.type)+'</span>';
+  if(m.type==="PROPOSE"){
+    var plans=arr(b.plans);
+    if(plans.length){ plans.forEach(function(p){ p=obj(p); h+='<div class="plan-line">▸ '+esc(p.label||obj(p.plan).id)+' '+utilChips(p.utility)+'</div>'; }); }
+    else arr(b.plan_ids).forEach(function(id){ h+='<div class="plan-line">▸ '+esc(lbl(id))+'</div>'; });
+  } else if(m.type==="CHECK"){
+    if(!b.passed){
+      el.className="msg fail";
+      h='<div class="head">✗ ENGINE rejected <b>'+esc(lbl(b.plan_id))+'</b> proposed by '+esc(b.proposed_by||"?")+'</div>';
+      var v=arr(b.violations); if(!v.length) v=arr(b.checks).filter(function(c){return c && c.passed===false;});
+      v.forEach(function(x){ x=obj(x); h+='<div class="viol"><b>'+esc(x.rule)+'</b> <span class="muted">['+esc(x.owner||"")+']</span> - '+esc(x.detail)+'</div>'; });
+    } else {
+      h+=' ✓ '+esc(lbl(b.plan_id))+' passed';
+    }
+  } else if(m.type==="VOTE"){
+    arr(b.votes).forEach(function(v){ v=obj(v); h+='<div class="vote"><span class="d '+esc(v.decision)+'">'+esc(v.decision)+'</span><span>'+esc(lbl(v.plan_id))+' <span class="muted">u='+num(v.utility,2)+' · '+esc(v.reason||"")+'</span></span></div>'; });
+    if(!arr(b.votes).length) h+=' <span class="muted">no valid plans to vote on</span>';
+  } else if(m.type==="CONSENSUS"){
+    el.className="banner cons";
+    h='✔ CONSENSUS in round '+esc(m.round)+': '+esc(lbl(b.plan_id))+(arr(b.candidates).length>1?' <span style="font-weight:400">(from '+b.candidates.length+' plans all three accepted)</span>':'');
+  } else if(m.type==="NO_CONSENSUS"){
+    el.className="banner nocons";
+    h='No consensus in round '+esc(m.round)+(arr(b.valid).length?' · '+b.valid.length+' valid plan(s) not accepted by all':'')+(arr(b.known_rules).length?' · agents now know rules: <span class="mono" style="font-weight:400">'+esc(b.known_rules.join(", "))+'</span>':'');
+  } else if(m.type==="FALLBACK"){
+    el.className="banner fb";
+    h='⚙ DETERMINISTIC FALLBACK: '+esc(lbl(b.plan_id));
+  } else {
+    h+=' <span class="mono">'+esc(JSON.stringify(b).slice(0,200))+'</span>';
+  }
+  if(m.rationale) h+='<div class="rat" style="font-weight:400">'+esc(m.rationale)+'</div>';
+  el.innerHTML=h;
+  return el;
+}
+
+/* ---------- decision panel ---------- */
+var ROWS=[
+  {k:"delay_min",n:"Arrival delay",u:"min",lower:true},
+  {k:"fuel_kg",n:"Extra fuel burn",u:"kg",lower:true},
+  {k:"hold_min",n:"Holding",u:"min",lower:true},
+  {k:"gate_wait_min",n:"Gate wait",u:"min",lower:true},
+  {k:"pax_protected",n:"Connecting pax protected",u:"pax",lower:false},
+  {k:"overtime_min",n:"Crew overtime",u:"min",lower:true},
+  {k:"next_dep_delay",n:"Next departure delay",u:"min",lower:true},
+  {k:"crew_duty_breach",n:"Crew duty breach",bool:true},
+  {k:"diverted",n:"Diverted",bool:true}
+];
+function renderDecision(d){
+  var res=obj(d.result), p=obj(res.plan), base=obj(d.baseline), met=obj(p.metrics), pid=obj(p.plan).id;
+  var isFb = res.outcome==="fallback";
+  var h='<h2><span>Decision</span><span class="outcome '+(isFb?'fb':'cons')+'">'+(isFb?'Deterministic fallback':'Consensus in round '+esc(res.rounds))+'</span></h2>';
+  h+='<div style="font-size:20px;font-weight:700;margin:4px 0 8px">'+esc(p.label||pid||"-")+'</div>';
+  if(p.feasible===false) h+='<div class="err">Engine marks this plan INFEASIBLE.</div>';
+  var vf=arr(res.violations_in_final);
+  if(vf.length) h+='<div class="err">Violations in final plan: '+esc(vf.map(function(v){return typeof v==="string"?v:(v.rule||JSON.stringify(v));}).join(", "))+'</div>';
+  // utility bars
+  h+='<div class="muted" style="font-size:12px;margin-top:4px">Agent utility (each agent\'s own decision model)</div>';
+  var u=obj(p.utility);
+  AGENTS.forEach(function(a){ var v=Number(u[a]); var w=isNaN(v)?0:Math.max(0,Math.min(1,v))*100;
+    h+='<div class="bar"><span style="color:'+COLORS[a]+';font-weight:700">'+a+'</span><div class="track"><div class="fill" style="width:'+w+'%;background:'+COLORS[a]+'"></div></div><span class="mono">'+num(u[a],2)+'</span></div>'; });
+  // checks
+  var ch=arr(p.checks);
+  if(ch.length){
+    var allOk=ch.every(function(c){return c&&c.passed;});
+    h+='<div class="muted" style="font-size:12px;margin-top:10px">Safety engine evidence: '+(allOk?'<span class="okc">all '+ch.length+' rules passed</span>':'<span class="badc">rule failures present</span>')+'</div><ul class="checks">';
+    ch.forEach(function(c){ c=obj(c); h+='<li><span class="'+(c.passed?'okc':'badc')+'">'+(c.passed?'✓':'✗')+'</span><span class="rule">'+esc(c.rule)+'</span><span>'+esc(c.detail)+'</span></li>'; });
+    h+='</ul>';
+  }
+  // before / after
+  h+='<div class="muted" style="font-size:12px;margin-top:10px">Versus status quo (no coordination): <span class="mono">'+esc(base.plan||"FCFS")+'</span></div>';
+  h+='<table><tr><th>Metric</th><th>Status quo</th><th>Negotiated</th><th>Δ</th></tr>';
+  ROWS.forEach(function(r){
+    var bv=base[r.k], nv=met[r.k];
+    if(r.k==="diverted" && nv==null) nv = obj(p.plan).kind==="divert";
+    if(r.k==="crew_duty_breach" && nv==null && met.overtime_min!=null && d.scenario && d.scenario.crew_max_overtime!=null) nv = Number(met.overtime_min)>Number(d.scenario.crew_max_overtime);
+    if(bv==null && nv==null) return;
+    var cls="", delta="";
+    if(r.bool){
+      var bs=bv==null?"-":(bv?"YES":"no"), ns=nv==null?"-":(nv?"YES":"no");
+      if(bv!=null&&nv!=null&&!!bv!==!!nv) cls = nv? "worse":"better";
+      h+='<tr><td>'+r.n+'</td><td>'+bs+'</td><td class="'+cls+'">'+ns+'</td><td></td></tr>'; return;
+    }
+    if(bv!=null && nv!=null && !isNaN(bv) && !isNaN(nv)){
+      var dd=Number(nv)-Number(bv);
+      if(Math.abs(dd)>1e-9){ cls = ((dd<0)===r.lower) ? "better":"worse"; delta=(dd>0?"+":"")+num(dd); }
+      else delta="=";
+    }
+    var fmt=function(v){ return v==null? "-" : num(v); };
+    var bstr=fmt(bv), nstr=fmt(nv);
+    if(r.k==="pax_protected"){ if(base.pax_total!=null) bstr+=' / '+num(base.pax_total); if(met.pax_total!=null) nstr+=' / '+num(met.pax_total); }
+    h+='<tr><td>'+r.n+' <span class="muted">'+(r.u||"")+'</span></td><td>'+bstr+'</td><td class="'+cls+'">'+nstr+'</td><td class="'+cls+'">'+delta+'</td></tr>';
+  });
+  h+='</table>';
+  // human decision
+  h+='<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px"><div class="muted" style="font-size:12px;margin-bottom:6px">Duty manager decision</div>';
+  h+='<div style="display:flex;gap:8px"><button class="btn ok" id="btnApprove">Approve plan</button><button class="btn bad" id="btnOverride">Override</button></div>';
+  h+='<div id="ovBox" style="display:none"><textarea id="ovNote" placeholder="Reason for override / alternative instruction (required)"></textarea><div style="display:flex;gap:8px;margin-top:6px"><button class="btn bad" id="btnOvSubmit">Submit override</button><button class="btn" id="btnOvCancel">Cancel</button></div></div>';
+  h+='<div id="decMsg"></div></div>';
+  $("decisionPanel").innerHTML=h;
+  $("btnApprove").onclick=function(){ sendDecision("APPROVE",""); };
+  $("btnOverride").onclick=function(){ $("ovBox").style.display="block"; $("ovNote").focus(); };
+  $("btnOvCancel").onclick=function(){ $("ovBox").style.display="none"; };
+  $("btnOvSubmit").onclick=function(){
+    var note=$("ovNote").value.trim();
+    if(!note){ $("decMsg").innerHTML='<div class="err">Please enter a note explaining the override.</div>'; return; }
+    sendDecision("OVERRIDE",note);
+  };
+}
+function sendDecision(kind, note){
+  var d=obj(state.data), res=obj(d.result), pid=obj(obj(res.plan).plan).id || "";
+  var fid = res.flight_id!=null? res.flight_id : (state.flight&&state.flight.id);
+  $("btnApprove").disabled=true; $("btnOverride").disabled=true;
+  post("/api/decision",{flight_id:fid, plan_id:pid, decision:kind, note:note}).then(function(){
+    var ts=new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit",second:"2-digit"});
+    $("ovBox").style.display="none";
+    $("decMsg").innerHTML='<div class="confirm">'+(kind==="APPROVE"?'✓ APPROVED':'⚠ OVERRIDDEN')+' by duty manager at '+esc(ts)+' · plan '+esc(pid)+(note?' · "'+esc(note)+'"':'')+' · logged</div>';
+  }).catch(function(e){
+    $("btnApprove").disabled=false; $("btnOverride").disabled=false;
+    $("decMsg").innerHTML='<div class="err">Could not record decision: '+esc(e.message)+'</div>';
+  });
+}
+
+/* ---------- evaluation ---------- */
+var LOWER_BETTER=/delay|fuel|hold|wait|overtime|breach|diver|violat|error|latency|elapsed|fail|reject|unsafe/i;
+function fmtObj(v){ return Object.keys(v).map(function(k){ var x=v[k]; return '<span class="mono">'+esc(k)+'</span>: <b>'+esc(typeof x==="number"?num(x,2):(typeof x==="object"?JSON.stringify(x):x))+'</b>'; }).join(" &nbsp;·&nbsp; "); }
+function loadEval(){
+  var el=$("evalPanel");
+  el.innerHTML='<h2>Evaluation</h2><div class="muted"><span class="spinner"></span>Loading...</div>';
+  api("/api/eval").then(function(ev){
+    ev=obj(ev);
+    var s=obj(ev.summary), b=obj(ev.baseline);
+    var h='<h2><span>Batch evaluation</span><span class="muted" style="text-transform:none;letter-spacing:0">'+(ev.n!=null?esc(ev.n)+' flights':'')+(ev.policy?' · policy '+esc(ev.policy):'')+'</span></h2>';
+    var both=Object.keys(s).filter(function(k){return k in b;});
+    var only=Object.keys(s).filter(function(k){return !(k in b);});
+    if(both.length){
+      h+='<table style="max-width:760px"><tr><th>Metric</th><th>Status quo</th><th>Negotiated</th><th>Δ</th></tr>';
+      both.forEach(function(k){
+        var bv=b[k], sv=s[k], cls="", delta="";
+        if(typeof bv==="number" && typeof sv==="number"){
+          var dd=sv-bv;
+          if(Math.abs(dd)>1e-9){ var lower=LOWER_BETTER.test(k) && !/protect|consensus|feasib|success/i.test(k); cls=((dd<0)===lower)?"better":"worse"; delta=(dd>0?"+":"")+num(dd,2); } else delta="=";
+        }
+        h+='<tr><td class="mono">'+esc(k)+'</td><td>'+esc(typeof bv==="number"?num(bv,2):bv)+'</td><td class="'+cls+'">'+esc(typeof sv==="number"?num(sv,2):sv)+'</td><td class="'+cls+'">'+delta+'</td></tr>';
+      });
+      h+='</table>';
+    }
+    if(only.length){
+      h+='<div class="muted" style="font-size:12px;margin-top:12px">Other summary metrics</div><table style="max-width:1000px">';
+      only.forEach(function(k){ var v=s[k]; h+='<tr><td class="mono">'+esc(k)+'</td><td style="text-align:left">'+(v&&typeof v==="object"?fmtObj(v):esc(typeof v==="number"?num(v,3):v))+'</td></tr>'; });
+      h+='</table>';
+    }
+    var fl=arr(ev.failures);
+    h+='<div class="muted" style="font-size:12px;margin-top:14px">Failures ('+fl.length+')'+(fl.length?' · click to load and replay that flight':'')+'</div>';
+    if(!fl.length) h+='<div class="okc" style="font-size:13px">None recorded.</div>';
+    h+='<div id="failList"></div>';
+    el.innerHTML=h;
+    var list=$("failList");
+    fl.forEach(function(f){
+      f=obj(f);
+      var d=document.createElement("div"); d.className="fail-item";
+      var extra=Object.keys(f).filter(function(k){return ["flight_id","callsign","reason"].indexOf(k)<0;}).map(function(k){return k+"="+(typeof f[k]==="object"?JSON.stringify(f[k]):f[k]);}).join(" · ");
+      d.innerHTML='<span class="mono">#'+esc(f.flight_id)+' '+esc(f.callsign||"")+'</span> <span class="badc">'+esc(f.reason||"")+'</span> <span class="muted">'+esc(extra)+'</span>';
+      d.addEventListener("click",function(){
+        if(f.flight_id==null) return;
+        showTab("neg");
+        selectFlight({id:f.flight_id, callsign:f.callsign||("#"+f.flight_id), route:f.route||"", date:f.date||""});
+        setTimeout(negotiate, 50);
+      });
+      list.appendChild(d);
+    });
+  }).catch(function(e){
+    el.innerHTML='<h2>Evaluation</h2><div class="empty">'+(e.status===404?'No batch evaluation generated yet. Run <span class="mono">python -m atm.evaluate</span> on the server.':'Could not load evaluation ('+esc(e.message)+').')+'</div>';
+  });
+}
+})();
+</script>
+</body>
+</html>

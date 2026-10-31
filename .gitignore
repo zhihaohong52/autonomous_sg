@@ -3,3 +3,4 @@ data/challenge1/*.csv
 data/challenge5/*.csv
 data/challenge2/flights.csv
 .DS_Store
+eval/decisions.jsonl
