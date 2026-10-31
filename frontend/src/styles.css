@@ -241,3 +241,13 @@ td .sub { display: block; font-size: var(--fs-small); color: var(--muted); line-
 .picklist button:hover { background: var(--raised); }
 .settings .menu.wide { width: 380px; }
 @media (max-width: 760px) { .settings .menu, .settings .menu.wide { width: calc(100vw - 32px); position: fixed; left: 16px; top: auto; } }
+.progress { font-size: 13px; margin-right: 4px; }
+.notes { margin: 14px 0 0; padding-left: 18px; font-size: 13px; color: var(--muted); max-width: 100ch; }
+/* type floor: 13px for every secondary line, a darker blue-grey for contrast on white and the ground */
+:root { --muted: #5b6472; --fs-small: 13px; }
+.code { font-size: 14px; }
+.revision .what { font-size: 28px; }
+.gantt text { font-size: 13px; }
+.gantt .lane-label { font-size: 13px; }
+.gantt .bar-label, .gantt .q-label { font-size: 12px; }
+td .sub { font-size: 13px; }

@@ -26,6 +26,11 @@ export function Benchmark() {
     api.benchmark().then(setRep).catch((e) => setErr(e instanceof ApiError ? { code: e.code, message: e.message } : { code: "error", message: String(e) }));
   }, []);
 
+  // the backend's reasons mix the verdict with column definitions and per-arm latency lines already in the table
+  const reasons = rep?.selection.reasons ?? [];
+  const isNote = (r: string) => /=|measured against|^outage test/i.test(r);
+  const why = reasons.filter((r) => !isNote(r) && !/p95 all decisions/i.test(r));
+  const notes = reasons.filter((r) => isNote(r) && !/^outage test/i.test(r));
   return (
     <main className="canvas">
       <header className="titlerow">
@@ -33,7 +38,7 @@ export function Benchmark() {
           <h1>Benchmark</h1>
           <p className="sub">{rep ? <>{rep.n_waves} real waves, seed {rep.seed}, every arm on the same waves. <b>Winner: {rep.selection.winner}</b> ({rep.selection.rule}).</> : "Each decision model against the formulas and the status quo on the same real waves."}</p>
         </div>
-        {rep && <span className="muted" style={{ fontSize: 12 }}>Generated {dateLabel(rep.generated_at)}</span>}
+        {rep && <span className="muted" style={{ fontSize: 13 }}>Generated {dateLabel(rep.generated_at)}</span>}
       </header>
 
       {!rep ? (
@@ -69,7 +74,7 @@ export function Benchmark() {
                       <td><span className="code">{a.label}</span>{a.model === rep.selection.winner && <span className="pill pos" style={{ marginLeft: 8 }}>Selected</span>}<span className="sub">{a.provider}</span></td>
                       {COLS.map((c) => {
                         const v = a.summary[c.key];
-                        if (v == null) return <td key={c.key} className="num muted" title="No data for this arm">—</td>;
+                        if (v == null) return <td key={c.key} className="num muted" title={a.provider === "formula" ? "The formula makes no model calls" : "No data for this arm"}>{a.provider === "formula" ? "n/a" : "—"}</td>;
                         const bad = c.key === "rule_violations_in_agreed_plans" && v > 0;
                         return <td key={c.key} className={`num${bad ? " neg" : ""}`}>{c.key === "cost_usd_per_wave" ? `$${v.toFixed(c.digits)}` : `${v.toFixed(c.digits)}${c.unit}`}</td>;
                       })}
@@ -78,21 +83,23 @@ export function Benchmark() {
                 </tbody>
               </table>
             </div>
+            {notes.length > 0 && <ul className="notes">{notes.map((n) => <li key={n}>{n}</li>)}</ul>}
           </section>
           <section className="card span-6">
-            <div className="card-head"><h2>Why this model</h2></div>
-            <ul style={{ margin: 0, paddingLeft: 18, lineHeight: 1.7 }}>{rep.selection.reasons.map((r) => <li key={r}>{r}</li>)}</ul>
+            <div className="card-head"><h2>Why {rep.arms.find((a) => a.model === rep.selection.winner)?.label ?? rep.selection.winner}</h2><span className="meta">{rep.selection.rule}</span></div>
+            <ul style={{ margin: 0, paddingLeft: 18, lineHeight: 1.7 }}>{why.map((r) => <li key={r}>{r}</li>)}</ul>
             <dl className="kv" style={{ marginTop: 16 }}>
               <dt>Engine switched off</dt><dd>{rep.ablation_no_engine_unsafe_pct == null ? <span className="muted">Not measured in this run</span> : <><span className="neg">{rep.ablation_no_engine_unsafe_pct.toFixed(1)}%</span> of agreed plans break a rule</>}</dd>
-              <dt>Outage test</dt><dd>{rep.outage_test.primary_disabled} disabled: {rep.outage_test.resolved} of {rep.outage_test.waves} waves resolved ({Object.entries(rep.outage_test.fallbacks_used).map(([k, v]) => `${k} ${v}`).join(", ")})</dd>
+              <dt>Outage test</dt><dd>{rep.outage_test.waves === 0 ? <span className="muted">Skipped: no model arm beat the formula, so there was no primary model to disable</span>
+                : <>{rep.outage_test.primary_disabled} disabled: {rep.outage_test.resolved} of {rep.outage_test.waves} waves resolved{Object.keys(rep.outage_test.fallbacks_used).length ? ` (${Object.entries(rep.outage_test.fallbacks_used).map(([k, v]) => `${k} ${v}`).join(", ")})` : ""}</>}</dd>
             </dl>
           </section>
           <section className="card span-6">
             <div className="card-head"><h2>Failures</h2><span className="meta">{rep.failures.length} listed</span></div>
             {rep.failures.length ? (
-              <table><tbody>{rep.failures.slice(0, 8).map((f) => (
+              <div className="table-wrap" style={{ maxHeight: 360, overflowY: "auto" }} tabIndex={0} role="region" aria-label="Failures"><table><tbody>{rep.failures.map((f) => (
                 <tr key={f.wave_id + f.model}><td><a className="code" style={{ color: "var(--text)" }} href={`#/wave/${f.wave_id}`}>{f.wave_id}</a><span className="sub">{f.model}</span></td><td style={{ whiteSpace: "normal" }}>{f.reason}</td></tr>
-              ))}</tbody></table>
+              ))}</tbody></table></div>
             ) : <p className="empty">No failures in this run.</p>}
           </section>
         </div>

@@ -1,98 +1,144 @@
 import type { JointPlan, Move, RuleCheck, WaveScenario } from "../api/types";
 import { clock } from "../format";
 
-const TURN = { narrow: 40, wide: 90 } as const;
-const W = 1158, LABEL = 64, RIGHT = 8, LANE = 25, BAR = 18, AXIS = 22, GAP = 14;
-const SPAN = 90;                                   // T+0 … T+90 minutes
-const x = (min: number) => LABEL + (Math.max(0, Math.min(SPAN, min)) / SPAN) * (W - LABEL - RIGHT);
+const W = 1158, LABEL = 64, RIGHT = 8, LANE = 22, BAR = 14, AXIS = 22, GAP = 16, NOTE = 20;
 
 export interface Rejection { seq: number; move: Move; violations: RuleCheck[]; runway?: string }
 
-export function Gantt({ wave, plan, rejection }: { wave: WaveScenario; plan: JointPlan | null; rejection: Rejection | null }) {
-  const runways = wave.airport.runways;
-  const gates = wave.gates;
-  const yRwy = (id: string) => AXIS + runways.findIndex((r) => r.id === id) * LANE;
-  const gatesTop = AXIS + runways.length * LANE + GAP;
-  const yGate = (id: string) => gatesTop + gates.findIndex((g) => g.id === id) * LANE;
-  const H = gatesTop + gates.length * LANE + 4;
-  const ticks = Array.from({ length: SPAN / 15 + 1 }, (_, i) => i * 15);
+interface Props {
+  wave: WaveScenario;
+  plan: JointPlan | null;
+  other?: JointPlan | null;            // the plan not shown (status quo or agreed); keeps the lanes steady when toggling
+  turn: number;                        // gate occupancy after in-block, the engine's turnaround (GND-GATE-FREE evidence)
+  rejection: Rejection | null;
+}
 
-  // which lane the rejected move touched
+// greedy sub-rows so overlapping bars on one gate never sit on top of each other
+function rows<T extends { from: number; to: number }>(items: T[]): (T & { row: number })[] {
+  const ends: number[] = [];
+  return [...items].sort((a, b) => a.from - b.from).map((it) => {
+    let r = ends.findIndex((e) => e <= it.from);
+    if (r < 0) { r = ends.length; ends.push(0); }
+    ends[r] = it.to;
+    return { ...it, row: r };
+  });
+}
+
+export function Gantt({ wave, plan, other, turn, rejection }: Props) {
+  const plans = [plan, other].filter(Boolean) as JointPlan[];
+  const land = (p: JointPlan) => p.assignments.filter((a) => a.action === "land");
+  const usedRwy = new Set([...wave.queue.map((q) => q.runway), ...plans.flatMap((p) => land(p).map((a) => a.runway ?? ""))]);
+  const runways = wave.airport.runways.filter((r) => !r.open || usedRwy.has(r.id));
+  const hiddenRwy = wave.airport.runways.length - runways.length;
+  const usedGate = new Set([...wave.flights.map((f) => f.scheduled_gate), ...plans.flatMap((p) => land(p).map((a) => a.gate ?? ""))]);
+  const gatesShown = wave.gates.filter((g) => usedGate.has(g.id));
+  const hiddenGates = wave.gates.length - gatesShown.length;
+
+  // the axis covers the wave hour plus 15 min, and reaches back to the earliest landing or in-block shown
+  const times = plans.flatMap((p) => land(p).flatMap((a) => [a.slot_min ?? 0, a.metrics.in_block_min ?? 0]));
+  const START = Math.min(0, Math.floor((Math.min(0, ...times) - 3) / 15) * 15), END = 75;
+  const x = (m: number) => LABEL + ((Math.max(START, Math.min(END, m)) - START) / (END - START)) * (W - LABEL - RIGHT);
+
+  const yRwy = (id: string) => AXIS + runways.findIndex((r) => r.id === id) * LANE;
+  const rwyEnd = AXIS + runways.length * LANE + (hiddenRwy ? NOTE : 0);
+  const gatesTop = rwyEnd + GAP;
+
+  const lanes = gatesShown.map((g) => {
+    const flights = (plan ? land(plan) : []).filter((a) => a.gate === g.id).map((a) => {
+      const from = a.metrics.in_block_min ?? a.slot_min ?? 0;
+      return { kind: "wave" as const, label: a.callsign, from, to: from + turn };
+    });
+    const busy = g.busy.map((b) => ({ kind: "busy" as const, label: b.label, from: b.from_min, to: b.to_min }));
+    const items = rows([...busy, ...flights]);
+    return { g, items, n: Math.max(1, ...items.map((i) => i.row + 1)) };
+  });
+  const gateY: Record<string, number> = {};
+  let y = gatesTop;
+  for (const l of lanes) { gateY[l.g.id] = y; y += l.n * LANE; }
+  const H = y + (hiddenGates ? NOTE : 0) + 4;
+  const ticks: number[] = [];
+  for (let t = START; t <= END; t += 15) ticks.push(t);
+
   let rejY: number | null = null;
   if (rejection) {
     const p = rejection.move.params;
     const cs = rejection.move.callsigns[0];
     const rwy = typeof p.runway === "string" ? p.runway : rejection.runway ?? plan?.assignments.find((a) => a.callsign === cs)?.runway;
-    if (typeof p.gate === "string" && gates.some((g) => g.id === p.gate)) rejY = yGate(p.gate);
-    else if (rwy) rejY = yRwy(rwy);
+    if (typeof p.gate === "string" && gateY[p.gate] != null) rejY = gateY[p.gate];
+    else if (rwy && runways.some((r) => r.id === rwy)) rejY = yRwy(rwy);
   }
+  const real = (label: string) => !/simulated/i.test(label);
 
   return (
     <div className="gantt-wrap" tabIndex={0} role="region" aria-label="Runway and gate timeline, scrolls sideways on small screens">
       <svg className="gantt" viewBox={`0 0 ${W} ${H}`} width="100%" role="img"
-        aria-label={`Runway and gate timeline, ${clock(wave.window_start, 0)} to ${clock(wave.window_start, SPAN)}`}>
+        aria-label={`Runway and gate timeline, ${clock(wave.window_start, START)} to ${clock(wave.window_start, END)}`}>
         {ticks.map((t) => (
           <g key={t}>
-            <line x1={x(t)} x2={x(t)} y1={AXIS - 4} y2={H} stroke="var(--gridline)" />
-            <text x={x(t)} y={12} textAnchor={t === 0 ? "start" : t === SPAN ? "end" : "middle"}>{clock(wave.window_start, t)}</text>
+            <line x1={x(t)} x2={x(t)} y1={AXIS - 4} y2={H} stroke={t === 0 || t === 60 ? "var(--control)" : "var(--gridline)"} />
+            <text x={x(t)} y={12} textAnchor={t === START ? "start" : t === END ? "end" : "middle"}>{clock(wave.window_start, t)}</text>
           </g>
         ))}
 
         {runways.map((r) => {
-          const y = yRwy(r.id);
+          const ry = yRwy(r.id);
           return (
             <g key={r.id}>
-              <text className="lane-label" x={0} y={y + 14} style={r.open ? undefined : { fill: "var(--muted)" }}>{r.id}</text>
+              <text className="lane-label" x={0} y={ry + 14} style={r.open ? undefined : { fill: "var(--muted)" }}>{r.id}</text>
               {!r.open && (
                 <>
-                  <rect x={x(0)} y={y + 4} width={x(SPAN) - x(0)} height={BAR} fill="url(#hatch)" rx={3} />
-                  <text x={x(0) + 8} y={y + 16} style={{ fill: "var(--muted)" }}>Closed · {r.closed_reason}</text>
+                  <rect x={x(START)} y={ry + 4} width={x(END) - x(START)} height={BAR} fill="url(#hatch)" rx={3} />
+                  <text x={x(START) + 8} y={ry + 15} style={{ fill: "var(--muted)" }}>Closed{r.closed_reason ? ` · ${r.closed_reason}` : ""}</text>
                 </>
               )}
               {wave.queue.filter((q) => q.runway === r.id).map((q) => (
-                <rect key={q.callsign} x={x(q.slot_min)} y={y + 4} width={7} height={BAR} rx={2} fill="var(--queue)">
+                <rect key={q.callsign} x={x(q.slot_min)} y={ry + 4} width={4} height={BAR} rx={1} fill="var(--queue)">
                   <title>{`${q.callsign} ${q.aircraft_type ?? ""} ${q.wake} · ${clock(wave.window_start, q.slot_min)} (fixed traffic)`}</title>
                 </rect>
               ))}
             </g>
           );
         })}
+        {hiddenRwy > 0 && <text x={LABEL} y={rwyEnd - 6} style={{ fontSize: 13 }}>{hiddenRwy} other runway{hiddenRwy === 1 ? "" : "s"} open, not used in this wave</text>}
 
-        <text x={0} y={gatesTop - 4} style={{ fontSize: 11 }}>Gates</text>
-        {gates.map((g) => {
-          const y = yGate(g.id);
-          return (
-            <g key={g.id}>
-              <text className="lane-label" x={0} y={y + 14}>{g.id === "RS" ? "Remote" : g.id}</text>
-              {g.busy.map((b) => (
-                <g key={b.label}>
-                  <rect x={x(b.from_min)} y={y + 4} width={Math.max(2, x(b.to_min) - x(b.from_min))} height={BAR} rx={3} fill="var(--busy)" />
-                  {x(b.to_min) - x(b.from_min) > 90 && <text className="q-label" x={x(b.from_min) + 6} y={y + 16}>{b.label}</text>}
-                </g>
-              ))}
-            </g>
-          );
-        })}
+        <text x={0} y={gatesTop - 4} style={{ fontSize: 13 }}>Gates</text>
+        {lanes.map(({ g, items }) => (
+          <g key={g.id}>
+            <text className="lane-label" x={0} y={gateY[g.id] + 14}>{g.id === "RS" ? "Remote" : g.id}</text>
+            {items.filter((i) => i.kind === "busy").map((b, i) => (
+              <g key={i}>
+                <rect x={x(b.from)} y={gateY[g.id] + b.row * LANE + 4} width={Math.max(2, x(b.to) - x(b.from))} height={BAR} rx={3} fill="var(--busy)"><title>{b.label}</title></rect>
+                {real(b.label) && x(b.to) - x(b.from) > 110 && <text className="q-label" x={x(b.from) + 6} y={gateY[g.id] + b.row * LANE + 15}>{b.label}</text>}
+              </g>
+            ))}
+          </g>
+        ))}
+        {hiddenGates > 0 && <text x={LABEL} y={H - 10} style={{ fontSize: 13 }}>{hiddenGates} other gate{hiddenGates === 1 ? "" : "s"} not used by these flights</text>}
 
-        {plan?.assignments.filter((a) => a.action === "land").map((a) => {
-          const f = wave.flights.find((fl) => fl.callsign === a.callsign)!;
+        {plan && land(plan).map((a) => {
           const slot = a.slot_min ?? 0, inb = a.metrics.in_block_min ?? slot;
-          const end = Math.max(f.next_departure_min, inb + TURN[f.gate_size]);
-          const ry = yRwy(a.runway ?? ""), gy = yGate(a.gate ?? "");
+          const ry = yRwy(a.runway ?? "");
+          const lane = lanes.find((l) => l.g.id === a.gate);
+          const item = lane?.items.find((i) => i.kind === "wave" && i.label === a.callsign);
+          const gy = (gateY[a.gate ?? ""] ?? 0) + (item?.row ?? 0) * LANE;
           const holdFrom = slot - a.metrics.hold_min;
-          const crowded = plan.assignments.some((o) => o !== a && o.runway === a.runway && (o.slot_min ?? 0) > slot && (o.slot_min ?? 0) - slot < 6);
+          const near = (o: typeof a) => o !== a && o.runway === a.runway && Math.abs((o.slot_min ?? 0) - slot) < 7;
+          const after = land(plan).some((o) => near(o) && (o.slot_min ?? 0) > slot);
+          const before = land(plan).some((o) => near(o) && (o.slot_min ?? 0) <= slot && o.callsign < a.callsign);
           return (
             <g key={a.callsign}>
               <g className="wave" style={{ transform: `translate(${x(slot)}px, ${ry}px)` }}>
-                {a.metrics.hold_min > 0 && <line x1={x(holdFrom) - x(slot)} x2={0} y1={13} y2={13} stroke="var(--hue)" strokeDasharray="2 3" />}
-                <rect x={0} y={4} width={8} height={BAR} rx={2} fill="var(--hue)" />
-                <text x={crowded ? -4 : 12} y={16} textAnchor={crowded ? "end" : "start"} style={{ font: "500 11px var(--mono)", fill: "var(--hue)" }}>{a.callsign}</text>
+                {a.metrics.hold_min > 0 && <line x1={x(holdFrom) - x(slot)} x2={0} y1={11} y2={11} stroke="var(--hue)" strokeDasharray="2 3" />}
+                <rect x={0} y={4} width={6} height={BAR} rx={2} fill="var(--hue)" />
+                {!(after && before) && <text x={after ? -4 : 10} y={15} textAnchor={after ? "end" : "start"} style={{ font: "500 12px var(--mono)", fill: "var(--hue)" }}>{a.callsign}</text>}
               </g>
-              <g className="wave" style={{ transform: `translate(${x(inb)}px, ${gy}px)` }}>
-                <rect x={0} y={4} width={Math.max(8, x(end) - x(inb))} height={BAR} rx={3} fill="var(--hue)" />
-                <text className="bar-label" x={6} y={16}>{a.callsign}</text>
-              </g>
-              <title>{`${a.callsign}: runway ${a.runway} ${clock(wave.window_start, slot)}, gate ${a.gate} ${clock(wave.window_start, inb)}`}</title>
+              {item && (
+                <g className="wave" style={{ transform: `translate(${x(inb)}px, ${gy}px)` }}>
+                  <rect x={0} y={4} width={Math.max(6, x(inb + turn) - x(inb))} height={BAR} rx={3} fill="var(--hue)" />
+                  <text className="bar-label" x={6} y={15}>{a.callsign}</text>
+                </g>
+              )}
+              <title>{`${a.callsign}: runway ${a.runway} ${clock(wave.window_start, slot)}, gate ${a.gate} ${clock(wave.window_start, inb)}–${clock(wave.window_start, inb + turn)}`}</title>
             </g>
           );
         })}
@@ -111,12 +157,13 @@ export function Gantt({ wave, plan, rejection }: { wave: WaveScenario; plan: Joi
   );
 }
 
-export function GanttLegend() {
+export function GanttLegend({ simulated }: { simulated?: boolean }) {
   return (
     <div className="legend">
       <span><i style={{ background: "var(--hue)" }} />Negotiated flights</span>
-      <span><i style={{ background: "var(--queue)" }} />Fixed traffic</span>
-      <span><i style={{ background: "var(--busy)" }} />Gate in use</span>
+      <span><i style={{ background: "var(--queue)", width: 4, height: 12, verticalAlign: -2 }} />Fixed arrivals</span>
+      <span><i style={{ background: "var(--busy)" }} />Gate held by another flight{simulated ? " (simulated)" : ""}</span>
+      <span><i style={{ width: 14, height: 0, borderTop: "1.5px dashed var(--hue)", borderRadius: 0, verticalAlign: 2 }} />Airborne holding</span>
     </div>
   );
 }

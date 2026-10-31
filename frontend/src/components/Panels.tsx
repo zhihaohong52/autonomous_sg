@@ -11,10 +11,11 @@ export function Outcome({ ev, base }: { ev: PlanEvaluation | null; base: PlanEva
     <div className="kpi"><div className="label">{label}</div><div className="value">{value}{value !== dash && <small>{unit}</small>}</div><div className="delta">{delta}</div></div>
   );
   const vs = (now: number | undefined, then: number | undefined, unit: string, goodDown = true, digits = 0) => {
-    if (now == null || then == null) return <span className="muted">Status quo —</span>;
+    if (then == null) return <span className="muted">Status quo —</span>;
+    if (now == null) return <span>Status quo {then.toFixed(digits)}{unit}</span>;
     const diff = +(now - then).toFixed(digits);
     const good = goodDown ? diff < 0 : diff > 0;
-    return <span>Status quo {then.toFixed(digits)}{unit} · <span className={diff === 0 ? "" : good ? "pos" : "neg"}>{signed(diff, unit)}</span></span>;
+    return <span>Status quo {then.toFixed(digits)}{unit} · {diff === 0 ? "no change" : <span className={good ? "pos" : "neg"}>{signed(diff, unit)}</span>}</span>;
   };
   return (
     <div className="kpis">
@@ -52,7 +53,7 @@ export function PlanTable({ wave, plan, baseline }: { wave: WaveScenario; plan: 
             const dPax = a && b ? a.metrics.pax_protected - b.metrics.pax_protected : null;
             return (
               <tr key={f.callsign}>
-                <td title={provShort(f.provenance)}><span className="code">{f.callsign}</span>{f.callsign === focus && <span className="pill" style={{ marginLeft: 8, height: 20 }}>Disruption flight</span>}<span className="sub">{f.aircraft_type ?? "—"} from {f.origin}{f.disrupted ? ` · ${Math.max(f.delays.weather, f.delays.late_aircraft)} min ${f.delays.weather >= f.delays.late_aircraft ? "weather" : "late aircraft"}` : ""}</span></td>
+                <td title={provShort(f.provenance)}><span className="code">{f.callsign}</span>{f.callsign === focus && <span className="pill" style={{ marginLeft: 8, height: 20 }}>Disruption flight</span>}<span className="sub">{f.aircraft_type ? `${f.aircraft_type} from` : "From"} {f.origin}{f.disrupted ? ` · ${Math.max(f.delays.weather, f.delays.late_aircraft)} min ${f.delays.weather >= f.delays.late_aircraft ? "weather" : "late aircraft"}` : ""}</span></td>
                 <td>{a ? <><span className="code">{a.action === "divert" ? "Divert" : a.runway}</span><span className="sub">{c(a.slot_min)}{a.metrics.hold_min ? ` · hold ${a.metrics.hold_min} min` : ""}{a.ground_delay_min ? ` · ${a.ground_delay_min} min at ${f.origin}` : ""}</span></> : <span className="muted">—</span>}</td>
                 <td>{a ? <><span className="code">{a.gate}</span><span className="sub">{a.gate !== f.scheduled_gate ? `was ${f.scheduled_gate}` : "scheduled"}</span></> : <span className="code muted">{f.scheduled_gate}</span>}</td>
                 <td className="num">{a ? <>{c(a.metrics.in_block_min)}<span className="sub">{a.metrics.next_dep_delay_min ? `next dep ${a.metrics.next_dep_delay_min} min late` : "next dep on time"}</span></> : <span className="muted">sched {c(f.sched_min)}</span>}</td>
@@ -103,7 +104,7 @@ export function Checks({ wave, ev, base }: { wave: WaveScenario; ev: PlanEvaluat
               <tbody>
                 {RULES.map((r) => (
                   <tr key={r.id}>
-                    <td>{r.name} <span className="code muted" style={{ fontSize: 11 }}>{r.id}</span></td>
+                    <td>{r.name} <span className="code muted" style={{ fontSize: 13 }}>{r.id}</span></td>
                     {wave.flights.map((f) => {
                       const c = find(r.id, f.callsign);
                       const on = pick?.rule === r.id && pick.cs === f.callsign;
@@ -164,7 +165,7 @@ export function Weather({ wave }: { wave: WaveScenario }) {
           })}
         </tbody>
       </table>}
-      {wave.runway_wind.length > 0 && <p className="muted" style={{ fontSize: 12, marginTop: 10 }}>Limits: {[...new Set(wave.runway_wind.map((w) => w.limit_source))].join("; ")}. Crosswind includes gusts.</p>}
+      {wave.runway_wind.length > 0 && <p className="muted" style={{ fontSize: 13, marginTop: 10 }}>Limits: {[...new Set(wave.runway_wind.map((w) => w.limit_source))].join("; ")}. Crosswind includes gusts.</p>}
     </section>
   );
 }
@@ -186,8 +187,11 @@ export function Sources({ wave }: { wave: WaveScenario }) {
 }
 
 /* ---------- the challenge output: the revision for the disruption flight ---------- */
-export function RevisionLine({ r }: { r: Revision | null; }) {
+export function RevisionLine({ r, plan, base }: { r: Revision | null; plan: JointPlan | null; base: JointPlan | null }) {
   if (!r) return null;
+  const m = plan?.assignments.find((a) => a.callsign === r.callsign)?.metrics;
+  const bm = base?.assignments.find((a) => a.callsign === r.callsign)?.metrics;
+  const miss = m ? m.pax_total - m.pax_protected : 0, bmiss = bm ? bm.pax_total - bm.pax_protected : null;
   const what = r.action === "divert" ? `Diverts to ${r.alternate ?? "the alternate"}`
     : `Lands ${r.revised_arrival} on ${r.runway}, gate ${r.gate}${r.gate !== r.scheduled_gate ? ` (was ${r.scheduled_gate})` : ""}`;
   const how = [r.speed_reduction_min ? `speed reduction ${r.speed_reduction_min} min` : "", r.ground_delay_min ? `ground delay ${r.ground_delay_min} min` : "", r.hold_min ? `holds ${r.hold_min} min` : ""].filter(Boolean).join(", ");
@@ -196,6 +200,9 @@ export function RevisionLine({ r }: { r: Revision | null; }) {
       <div className="label">Revision for <span className="code">{r.callsign}</span>, scheduled {r.scheduled_arrival}</div>
       <div className="what">{what}</div>
       <div className="delta">{how ? `${how[0].toUpperCase()}${how.slice(1)} · ` : ""}<span className={r.delay_vs_schedule_min > 0 ? "neg" : "pos"}>{signed(r.delay_vs_schedule_min, " min")}</span> vs schedule</div>
+      {m && m.pax_total > 0 && (
+        <div className="delta">{miss ? <><span className="neg">{miss} of {m.pax_total} connecting passengers miss their connection</span>{bmiss != null ? (bmiss === miss ? ", the same as the status quo" : `, against ${bmiss} in the status quo`) : ""}</> : `All ${m.pax_total} connecting passengers make their connection`}.</div>
+      )}
     </div>
   );
 }
