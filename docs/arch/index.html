@@ -16,10 +16,14 @@ h1 span { color:var(--muted); font-weight:400; font-size:28px; margin-left:18px;
 .grp { position:absolute; border:2px dashed var(--line); border-radius:22px; }
 .grp > .k { position:absolute; top:-12px; left:24px; background:var(--bg); padding:0 10px; }
 svg { position:absolute; inset:0; }
+.q { position:absolute; top:810px; width:450px; height:215px; border:2px solid var(--line); border-radius:14px; padding:16px 20px; background:#111821; }
+.q b { display:block; font-size:21px; margin-bottom:8px; line-height:1.25; }
+.q p { font-size:16px; color:var(--muted); line-height:1.4; margin-top:4px; }
+.q i { font-style:normal; color:var(--ink); font-weight:700; }
 </style></head><body>
 <div id="root" data-composition-id="main" data-start="0" data-duration="2" data-width="1920" data-height="1080">
 <div id="d" class="clip" data-start="0" data-duration="2" data-track-index="0" data-layout-allow-overlap>
-<h1>Final Approach<span>system architecture</span></h1>
+<h1>Final Approach<span>system architecture · FastAPI + SSE on Render · React UI · every limit returned with its source</span></h1>
 <svg viewBox="0 0 1920 1080"><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#6b7d8f"/></marker></defs>
 <g stroke="#6b7d8f" stroke-width="2.5" fill="none" marker-end="url(#a)">
 <path d="M400 330 L470 330"/><path d="M400 560 L470 400"/>
@@ -27,12 +31,12 @@ svg { position:absolute; inset:0; }
 <path d="M1120 250 L1190 250"/><path d="M1120 420 L1190 420"/>
 <path d="M1335 300 L1335 370"/>
 <path d="M1480 420 L1550 420"/><path d="M1480 520 L1550 640"/>
-<path d="M1700 480 L1700 590"/>
-<path d="M1700 760 L1700 830"/>
-<path d="M975 600 L975 520"/>
+<path d="M1700 500 L1700 590"/>
+<path d="M1700 732 L1700 785"/>
+<path d="M975 600 L975 520"/><path d="M845 525 L700 770" stroke="#b48cff" stroke-dasharray="6 6"/>
 </g></svg>
 
-<div class="grp" style="left:60px;top:150px;width:350px;height:600px"><div class="k" style="color:var(--blue)">Real data in</div></div>
+<div class="grp" style="left:60px;top:150px;width:350px;height:510px"><div class="k" style="color:var(--blue)">Real data in</div></div>
 <div class="b" style="left:85px;top:185px;width:300px"><b>flights.csv row</b><p>DOT 2015 disrupted arrival: weather or late-aircraft delay</p></div>
 <div class="b" style="left:85px;top:345px;width:300px"><b>Airport world</b><p>OurAirports runways · OSM gates · IEM METAR at that hour</p></div>
 <div class="b" style="left:85px;top:505px;width:300px"><b>Workbook limits</b><p>wake, capacity, fuel, crew duty, gates · FAA crosswind</p></div>
@@ -47,11 +51,14 @@ svg { position:absolute; inset:0; }
 
 <div class="b" style="left:1555px;top:370px;width:300px;border-color:var(--green)"><b>Agreed plan</b><p>revised arrival time, runway, gate</p></div>
 <div class="b" style="left:1555px;top:595px;width:300px;border-color:var(--amber)"><div class="k" style="color:var(--amber)">No consensus after 3 turns</div><p>deterministic solver decides; reason logged</p></div>
-<div class="b" style="left:1555px;top:835px;width:300px"><b>Duty manager</b><p>approve or override (reason required) in the web UI</p></div>
-<div class="b" style="left:1240px;top:835px;width:290px;border-color:var(--blue)"><div class="k" style="color:var(--blue)">Claude Haiku 5.5</div><p>writes the brief from the log; decides nothing</p></div>
+<div class="b" style="left:1555px;top:790px;width:300px;padding:14px 22px"><b>Duty manager</b><p>approve or override (reason required) in the web UI</p></div>
+<div class="b" style="left:1555px;top:940px;width:300px;padding:12px 18px;border-color:var(--blue)"><div class="k" style="color:var(--blue)">Claude Haiku 5.5</div><p>writes the brief from the log; decides nothing</p></div>
 
 <div class="b" style="left:820px;top:610px;width:620px"><div class="k" style="color:var(--muted)">Benchmark · picks the default</div><p>50 seeded rows (+1,000-row scale run): status quo, optimiser, formulas, 3 models · outage and engine-off tests</p></div>
-<div class="b" style="left:85px;top:835px;width:1100px"><div class="k" style="color:var(--muted)">Serving</div><p>FastAPI + SSE stream on Render · React UI · recorded replays · every limit returned with its source</p></div>
+<div class="grp" style="left:60px;top:775px;width:1440px;height:270px;border-color:var(--violet)"><div class="k" style="color:var(--violet)">What jev-1.14 is asked (TypeSafe System One) · code does the maths, the model judges</div></div>
+<div class="q" style="left:85px"><div class="k" style="color:var(--violet)">1 · Triage · Score</div><b>“How severe is this wave?”</b><p><i>Given:</i> closures, wind, queue, delays</p><p><i>Out:</i> level 0–3 + probability → sets moves per turn</p></div>
+<div class="q" style="left:560px"><div class="k" style="color:var(--violet)">2 · Move · Choice</div><b>“Pick ONE move for your authority, or no move”</b><p><i>Given per option:</i> fixes / adds rule breaches · better / worse for you · engine rank</p><p><i>Out:</i> option key + probabilities → engine CHECK, veto if it adds a breach</p></div>
+<div class="q" style="left:1035px"><div class="k" style="color:var(--violet)">3 · Vote · Noul (yes/no)</div><b>“Do you accept plan P?”</b><p><i>Given:</i> passes every rule · meets your minimum (yes, clearly / just; no) · best for you?</p><p><i>Out:</i> P(accept) ≥ 0.5 → ACCEPT; code tallies 3 of 3</p></div>
 </div></div>
 <script>const tl = gsap.timeline({ paused: true }); window.__timelines["main"] = tl; tl.seek(0);</script>
 </body></html>
