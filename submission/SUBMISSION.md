@@ -16,6 +16,8 @@ Final Approach: ATC, Pilot and Ground agents agree a rule-checked plan
 
 https://github.com/zhihaohong52/final_approach
 
+Deck video: https://youtu.be/JpgnufOeDQQ
+
 Live demo: https://disruption-negotiator.onrender.com (Render free tier, allow about 1 minute for a cold start)
 
 ---

@@ -2,9 +2,9 @@
 
 Design: `docs/superpowers/specs/2026-10-31-disruption-negotiator-design.md` · API contract: `docs/api-contract.md`
 
-**Live demo:** https://disruption-negotiator.onrender.com · **Deck (36 s):** [`deck/final-approach-deck.mp4`](deck/final-approach-deck.mp4)
+**Live demo:** https://disruption-negotiator.onrender.com · **Deck (36 s):** [YouTube](https://youtu.be/JpgnufOeDQQ) · [MP4](deck/final-approach-deck.mp4)
 
-[![Final Approach deck: click to play](deck/poster.png)](deck/final-approach-deck.mp4)
+[![Final Approach deck: click to play on YouTube](deck/poster.png)](https://youtu.be/JpgnufOeDQQ)
 
 ## 1. Pitch
 
