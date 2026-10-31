@@ -1,0 +1,81 @@
+location_id,province,district,production_kilotons,production_tonnes,latitude,longitude
+KAL_SUP_01,West Kalimantan,Ketapang,90.12,90120,-1.9635,110.1136
+KAL_SUP_02,Central Kalimantan,Kotawaringin Barat,96.6,96600,-2.1083,111.5801
+KAL_SUP_03,West Kalimantan,Ketapang,96.44,96440,-2.0515,109.9553
+KAL_SUP_04,East Kalimantan,Paser,99.22,99220,-1.6149,116.3117
+KAL_SUP_05,Central Kalimantan,Kotawaringin Timur,90.46,90460,-2.085,113.235
+KAL_SUP_06,West Kalimantan,Ketapang,87.91,87910,-1.847,110.0258
+KAL_SUP_07,West Kalimantan,Ketapang,89.06,89060,-2.0294,110.3472
+KAL_SUP_08,West Kalimantan,Sanggau,94.0,94000,0.2911,110.6932
+KAL_SUP_09,Central Kalimantan,Kotawaringin Barat,26.33,26330,-2.264,111.7926
+KAL_SUP_10,East Kalimantan,Kutai Kartanegara,99.51,99510,-0.6682,116.8524
+KAL_SUP_11,East Kalimantan,Kutai Kartanegara,92.16,92160,-0.664,117.3125
+KAL_SUP_12,Central Kalimantan,Kotawaringin Timur,93.8,93800,-2.7613,112.8714
+KAL_SUP_13,East Kalimantan,Kutai Kartanegara,92.81,92810,-0.3066,116.8705
+KAL_SUP_14,West Kalimantan,Ketapang,29.34,29340,-2.1397,110.2164
+KAL_SUP_15,West Kalimantan,Ketapang,88.32,88320,-1.682,110.4027
+KAL_SUP_16,Central Kalimantan,Kotawaringin Timur,98.25,98250,-2.5858,112.7929
+KAL_SUP_17,East Kalimantan,Kutai Kartanegara,88.27,88270,-0.3747,116.804
+KAL_SUP_18,North Kalimantan,Bulungan,92.89,92890,2.61,117.2423
+KAL_SUP_19,Central Kalimantan,Kotawaringin Timur,99.71,99710,-2.5394,112.8334
+KAL_SUP_20,Central Kalimantan,Kotawaringin Barat,34.1,34100,-2.9999,111.9992
+KAL_SUP_21,East Kalimantan,Paser,90.65,90650,-2.1934,115.7592
+KAL_SUP_22,West Kalimantan,Ketapang,89.0,89000,-1.5194,109.602
+KAL_SUP_23,West Kalimantan,Sanggau,92.52,92520,-0.0962,110.4256
+KAL_SUP_24,East Kalimantan,Paser,96.52,96520,-1.8548,116.1854
+KAL_SUP_25,West Kalimantan,Sanggau,88.0,88000,0.3297,110.817
+KAL_SUP_26,South Kalimantan,Tanah Laut,93.86,93860,-4.0801,114.8675
+KAL_SUP_27,Central Kalimantan,Kotawaringin Barat,93.25,93250,-1.9857,111.856
+KAL_SUP_28,Central Kalimantan,Kotawaringin Barat,88.6,88600,-2.3295,111.9558
+KAL_SUP_29,West Kalimantan,Ketapang,88.41,88410,-1.6332,110.1275
+KAL_SUP_30,East Kalimantan,Kutai Kartanegara,99.81,99810,-0.3435,117.0175
+KAL_SUP_31,West Kalimantan,Ketapang,96.65,96650,-1.6977,109.6352
+KAL_SUP_32,West Kalimantan,Ketapang,92.04,92040,-1.6782,109.7887
+KAL_SUP_33,Central Kalimantan,Kotawaringin Timur,96.69,96690,-2.6368,112.6695
+KAL_SUP_34,West Kalimantan,Sanggau,87.84,87840,0.2514,110.2592
+KAL_SUP_35,West Kalimantan,Ketapang,99.9,99900,-1.6283,110.2045
+KAL_SUP_36,Central Kalimantan,Kotawaringin Timur,91.25,91250,-2.5737,112.6033
+KAL_SUP_37,West Kalimantan,Ketapang,97.19,97190,-2.0081,109.8869
+KAL_SUP_38,East Kalimantan,Kutai Kartanegara,23.62,23620,-0.3295,117.0183
+KAL_SUP_39,West Kalimantan,Sanggau,95.76,95760,0.2131,110.645
+KAL_SUP_40,West Kalimantan,Sanggau,22.84,22840,-0.2488,110.4914
+KAL_SUP_41,West Kalimantan,Ketapang,91.08,91080,-1.7119,110.0077
+KAL_SUP_42,West Kalimantan,Sanggau,88.76,88760,0.133,110.3271
+KAL_SUP_43,West Kalimantan,Ketapang,87.96,87960,-1.6746,109.7672
+KAL_SUP_44,East Kalimantan,Kutai Kartanegara,91.87,91870,-0.3668,116.8975
+KAL_SUP_45,Central Kalimantan,Kotawaringin Timur,94.55,94550,-2.0425,113.0427
+KAL_SUP_46,West Kalimantan,Sanggau,96.19,96190,0.2625,110.7212
+KAL_SUP_47,Central Kalimantan,Kotawaringin Timur,88.6,88600,-2.4623,113.0832
+KAL_SUP_48,West Kalimantan,Ketapang,88.95,88950,-1.6378,110.0902
+KAL_SUP_49,Central Kalimantan,Kotawaringin Barat,94.09,94090,-2.6715,111.589
+KAL_SUP_50,West Kalimantan,Ketapang,90.03,90030,-2.1621,109.9169
+KAL_SUP_51,West Kalimantan,Ketapang,93.01,93010,-1.9542,110.0706
+KAL_SUP_52,East Kalimantan,Paser,90.57,90570,-1.5392,115.8861
+KAL_SUP_53,West Kalimantan,Sanggau,91.7,91700,0.2589,110.3311
+KAL_SUP_54,East Kalimantan,Kutai Kartanegara,92.83,92830,-0.712,116.982
+KAL_SUP_55,East Kalimantan,Kutai Kartanegara,89.76,89760,-0.4098,116.5264
+KAL_SUP_56,East Kalimantan,Paser,89.47,89470,-2.2348,115.7677
+KAL_SUP_57,East Kalimantan,Kutai Kartanegara,25.07,25070,-0.0881,116.8219
+KAL_SUP_58,West Kalimantan,Ketapang,96.97,96970,-1.8634,109.8828
+KAL_SUP_59,South Kalimantan,Tanah Laut,87.72,87720,-3.9454,114.676
+KAL_SUP_60,South Kalimantan,Tanah Laut,93.13,93130,-3.5655,114.8385
+KAL_SUP_61,East Kalimantan,Paser,89.76,89760,-2.0292,116.2806
+KAL_SUP_62,West Kalimantan,Ketapang,96.05,96050,-1.6347,109.7354
+KAL_SUP_63,West Kalimantan,Sanggau,92.73,92730,0.4711,110.978
+KAL_SUP_64,Central Kalimantan,Kotawaringin Barat,89.4,89400,-2.6729,112.0284
+KAL_SUP_65,Central Kalimantan,Kotawaringin Barat,88.1,88100,-2.5395,111.7025
+KAL_SUP_66,East Kalimantan,Kutai Kartanegara,98.64,98640,-0.3758,117.121
+KAL_SUP_67,Central Kalimantan,Kotawaringin Barat,89.3,89300,-2.6718,111.704
+KAL_SUP_68,Central Kalimantan,Kotawaringin Barat,35.94,35940,-2.7388,111.3012
+KAL_SUP_69,West Kalimantan,Ketapang,30.99,30990,-2.1443,110.0022
+KAL_SUP_70,North Kalimantan,Bulungan,96.08,96080,2.8936,117.2919
+KAL_SUP_71,Central Kalimantan,Kotawaringin Timur,93.87,93870,-2.4114,112.9518
+KAL_SUP_72,Central Kalimantan,Kotawaringin Timur,99.42,99420,-2.2989,113.0191
+KAL_SUP_73,West Kalimantan,Sanggau,99.03,99030,-0.2772,110.5956
+KAL_SUP_74,West Kalimantan,Sanggau,99.61,99610,0.2713,111.0006
+KAL_SUP_75,West Kalimantan,Sanggau,93.87,93870,0.1668,110.9547
+KAL_SUP_76,Central Kalimantan,Kotawaringin Barat,27.79,27790,-2.214,111.9176
+KAL_SUP_77,East Kalimantan,Kutai Kartanegara,91.32,91320,-0.7849,117.0677
+KAL_SUP_78,Central Kalimantan,Kotawaringin Barat,97.14,97140,-2.3248,111.4876
+KAL_SUP_79,Central Kalimantan,Kotawaringin Barat,32.55,32550,-2.5115,112.0284
+KAL_SUP_80,West Kalimantan,Ketapang,92.4,92400,-2.1498,109.7591

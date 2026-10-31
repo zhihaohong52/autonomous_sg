@@ -1,0 +1,5 @@
+# Large datasets: run scripts/fetch_data.sh
+data/challenge1/*.csv
+data/challenge5/*.csv
+data/challenge2/flights.csv
+.DS_Store
