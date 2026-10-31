@@ -1,6 +1,6 @@
 # API contract: Disruption Negotiator v2 (wave mode)
 
-Status: **draft v1, 31 Oct 2026 12:00**. Frozen at 12:30 for the frontend; any later change is
+Status: **v1.1, 31 Oct 2026 12:45** (added `Triage`; `/api/eval` marked v1). Frozen at 12:30 for the frontend; any later change is
 announced in the commit message with the prefix `contract:`. Design: `docs/superpowers/specs/2026-10-31-disruption-negotiator-design.md`.
 
 The frontend (Vite + React + TS, `frontend/`) talks only to these endpoints. In dev, Vite proxies
@@ -42,7 +42,7 @@ interface Provenance {
 | GET | `/api/runs/{run_id}` | `NegotiationResult` (with full `log`) |
 | POST | `/api/decision` | `{ ok: true, recorded_at: string }` |
 | GET | `/api/benchmark` | `BenchmarkReport` (404 until generated) |
-| GET | `/api/eval` | `EvalReport` (404 until generated) |
+| GET | `/api/eval` | v1 single-flight eval (legacy shape; not used by the React app) |
 | GET | `/mcp` | MCP server (not used by the frontend) |
 
 v1 single-flight endpoints (`/api/negotiate`, `/api/random`, …) stay as they are for `web/index.html`; the React app does not use them.
@@ -102,6 +102,8 @@ interface WaveScenario {
   severity?: Triage;                   // filled once a negotiation has triaged it
   provenance: Provenance[];            // per layer for the whole wave
 }
+
+interface Triage { score: number; levels: string[]; probabilities: number[]; confidence?: number }  // 0-based score
 
 interface Airport {
   iata: string; icao: string; name: string; lat: number; lon: number;
@@ -335,8 +337,7 @@ interface BenchmarkReport {
 }
 ```
 
-`GET /api/eval` returns the same shape as `BenchmarkReport` restricted to the default model over all
-evaluated waves (more waves, one arm).
+`GET /api/eval` is the frozen v1 single-flight evaluation; the React app uses `/api/benchmark` only.
 
 ## Screens the contract is meant to support (from the design)
 
