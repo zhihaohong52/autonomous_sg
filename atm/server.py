@@ -523,7 +523,7 @@ async def negotiate_wave(request: Request, body: dict = Body(...)):
             loop.call_soon_threadsafe(q.put_nowait, ("message", m))
 
         try:
-            raw = GR.negotiate_wave(wave, mode, chain, on_message)
+            raw = GR.negotiate_wave(wave, mode, chain, on_message, narrate=True)  # UI runs always get a brief
             if cancel.is_set():
                 return
             res = finish(raw, msgs)

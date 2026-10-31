@@ -679,7 +679,10 @@ _GRAPH = None
 
 
 def negotiate_wave(wave: Wave, mode: str, chain: list[str] | None = None,
-                   on_message: Callable[[dict], None] | None = None, run_id: str | None = None) -> dict:
+                   on_message: Callable[[dict], None] | None = None, run_id: str | None = None,
+                   narrate: bool = False) -> dict:
+    """`narrate`: Claude writes the duty-manager brief in any mode (always on in decision+claude).
+    Narration only explains the finished outcome; it never changes the plan."""
     global _GRAPH
     if mode not in ("formulas", "decision", "decision+claude"):
         raise ValueError(f"unknown mode {mode!r}")
@@ -707,7 +710,7 @@ def negotiate_wave(wave: Wave, mode: str, chain: list[str] | None = None,
         "log": run.log,
     }
     result["baseline"]["plan"] = base.to_dict()
-    if mode == "decision+claude":
+    if mode == "decision+claude" or narrate:
         from atm.wave.narrate import brief
         nar = brief(result)
         err = nar.pop("error", None)  # keep the contract shape; surface the failure in model_errors

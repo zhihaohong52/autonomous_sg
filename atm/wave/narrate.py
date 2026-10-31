@@ -9,7 +9,7 @@ import os
 
 from pydantic import BaseModel, Field
 
-MODEL = os.environ.get("NARRATION_MODEL", "claude-opus-5-5")
+MODEL = os.environ.get("NARRATION_MODEL", "claude-haiku-5-5")  # fast and cheap; it only explains
 MAX_WORDS = 120
 MAX_LINES = 40
 KEY_TYPES = ("TRIAGE", "OPEN", "AGENT_TURN", "CHECK", "CONSENSUS", "NO_CONSENSUS", "FALLBACK",
