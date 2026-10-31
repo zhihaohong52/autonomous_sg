@@ -20,5 +20,6 @@ COPY --from=web /dist /app/frontend/dist
 RUN useradd -m -u 1000 user && chown -R user:user /app
 USER user
 ENV PORT=7860
+ENV ATM_REQUIRE_REAL=1
 EXPOSE 7860
 CMD ["uvicorn", "atm.server:app", "--host", "0.0.0.0", "--port", "7860"]

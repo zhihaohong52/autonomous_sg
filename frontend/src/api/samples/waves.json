@@ -1,0 +1,25 @@
+[
+  {
+    "id": "ATL-2024-07-15-16",
+    "airport": {
+      "iata": "ATL",
+      "icao": "KATL",
+      "name": "Hartsfield-Jackson Atlanta Intl"
+    },
+    "window_start": "2024-07-15T16:00:00",
+    "window_end": "2024-07-15T17:00:00",
+    "n_flights": 4,
+    "n_queue": 3,
+    "callsigns": [
+      "DL100",
+      "DL201",
+      "AA302",
+      "UA403"
+    ],
+    "disrupted_callsigns": [
+      "DL100"
+    ],
+    "weather_summary": "KATL 151551Z 27015KT 10SM FEW040 30/20 A2992",
+    "replay_available": false
+  }
+]

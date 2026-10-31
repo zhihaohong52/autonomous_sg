@@ -1,0 +1,349 @@
+{
+  "id": "ATL-2024-07-15-16",
+  "airport": {
+    "iata": "ATL",
+    "icao": "KATL",
+    "name": "Hartsfield-Jackson Atlanta Intl",
+    "lat": 33.64,
+    "lon": -84.43,
+    "runways": [
+      {
+        "id": "08L",
+        "heading_true": 94,
+        "length_ft": 9000,
+        "open": true,
+        "closed_reason": null,
+        "le_lat": null,
+        "le_lon": null,
+        "he_lat": null,
+        "he_lon": null
+      },
+      {
+        "id": "26R",
+        "heading_true": 274,
+        "length_ft": 9000,
+        "open": true,
+        "closed_reason": null,
+        "le_lat": null,
+        "le_lon": null,
+        "he_lat": null,
+        "he_lon": null
+      },
+      {
+        "id": "09R",
+        "heading_true": 94,
+        "length_ft": 9000,
+        "open": true,
+        "closed_reason": null,
+        "le_lat": null,
+        "le_lon": null,
+        "he_lat": null,
+        "he_lon": null
+      },
+      {
+        "id": "27L",
+        "heading_true": 274,
+        "length_ft": 9000,
+        "open": true,
+        "closed_reason": null,
+        "le_lat": null,
+        "le_lon": null,
+        "he_lat": null,
+        "he_lon": null
+      }
+    ]
+  },
+  "window_start": "2024-07-15T16:00:00",
+  "metar": {
+    "raw": "KATL 151551Z 27015KT 10SM FEW040 30/20 A2992",
+    "station": "KATL",
+    "observed_at": "2024-07-15T15:51:00Z",
+    "wind_dir_deg": 270,
+    "wind_kt": 15,
+    "gust_kt": null,
+    "visibility_sm": 10,
+    "ceiling_ft": null,
+    "wx_codes": [],
+    "surface": "dry"
+  },
+  "runway_wind": [],
+  "queue": [
+    {
+      "callsign": "WN1",
+      "aircraft_type": "B737",
+      "wake": "LARGE",
+      "runway": "26R",
+      "slot_min": 2
+    },
+    {
+      "callsign": "DL7",
+      "aircraft_type": "A321",
+      "wake": "LARGE",
+      "runway": "27L",
+      "slot_min": 4
+    },
+    {
+      "callsign": "F99",
+      "aircraft_type": "A320",
+      "wake": "LARGE",
+      "runway": "26R",
+      "slot_min": 10
+    }
+  ],
+  "flights": [
+    {
+      "callsign": "DL100",
+      "carrier": "DL",
+      "airline": "DL",
+      "flight_no": 100,
+      "tail": null,
+      "aircraft_type": "B772",
+      "wake": "HEAVY",
+      "gate_size": "wide",
+      "origin": "ORD",
+      "sched_arr": "2024-07-15T16:05:00",
+      "sched_min": 5,
+      "eta_earliest_min": 5,
+      "airborne": true,
+      "disrupted": true,
+      "delays": {
+        "weather": 40,
+        "late_aircraft": 0,
+        "nas": 0,
+        "carrier": 0,
+        "arr_delay": 40
+      },
+      "fuel": {
+        "extra_min": 30,
+        "alternate": "BHM",
+        "alternate_min": 35,
+        "final_reserve_min": 30
+      },
+      "connections": [
+        {
+          "flight": "DL900",
+          "pax": 12,
+          "departs_min": 65
+        }
+      ],
+      "scheduled_gate": "A5",
+      "crew_shift_end_min": 95,
+      "next_departure_min": 55,
+      "provenance": [
+        {
+          "layer": "flights",
+          "status": "real",
+          "source": "test fixture",
+          "detail": null
+        }
+      ]
+    },
+    {
+      "callsign": "DL201",
+      "carrier": "DL",
+      "airline": "DL",
+      "flight_no": 201,
+      "tail": null,
+      "aircraft_type": "A321",
+      "wake": "LARGE",
+      "gate_size": "narrow",
+      "origin": "ORD",
+      "sched_arr": "2024-07-15T16:06:00",
+      "sched_min": 6,
+      "eta_earliest_min": 6,
+      "airborne": true,
+      "disrupted": false,
+      "delays": {
+        "weather": 0,
+        "late_aircraft": 0,
+        "nas": 0,
+        "carrier": 0,
+        "arr_delay": 0
+      },
+      "fuel": {
+        "extra_min": 30,
+        "alternate": "BHM",
+        "alternate_min": 35,
+        "final_reserve_min": 30
+      },
+      "connections": [
+        {
+          "flight": "DL900",
+          "pax": 12,
+          "departs_min": 66
+        }
+      ],
+      "scheduled_gate": "A1",
+      "crew_shift_end_min": 96,
+      "next_departure_min": 56,
+      "provenance": [
+        {
+          "layer": "flights",
+          "status": "real",
+          "source": "test fixture",
+          "detail": null
+        }
+      ]
+    },
+    {
+      "callsign": "AA302",
+      "carrier": "AA",
+      "airline": "AA",
+      "flight_no": 302,
+      "tail": null,
+      "aircraft_type": "B738",
+      "wake": "LARGE",
+      "gate_size": "narrow",
+      "origin": "ORD",
+      "sched_arr": "2024-07-15T16:08:00",
+      "sched_min": 8,
+      "eta_earliest_min": 8,
+      "airborne": true,
+      "disrupted": false,
+      "delays": {
+        "weather": 0,
+        "late_aircraft": 0,
+        "nas": 0,
+        "carrier": 0,
+        "arr_delay": 0
+      },
+      "fuel": {
+        "extra_min": 16,
+        "alternate": "BHM",
+        "alternate_min": 35,
+        "final_reserve_min": 30
+      },
+      "connections": [
+        {
+          "flight": "DL900",
+          "pax": 12,
+          "departs_min": 68
+        }
+      ],
+      "scheduled_gate": "A2",
+      "crew_shift_end_min": 98,
+      "next_departure_min": 58,
+      "provenance": [
+        {
+          "layer": "flights",
+          "status": "real",
+          "source": "test fixture",
+          "detail": null
+        }
+      ]
+    },
+    {
+      "callsign": "UA403",
+      "carrier": "UA",
+      "airline": "UA",
+      "flight_no": 403,
+      "tail": null,
+      "aircraft_type": "A320",
+      "wake": "LARGE",
+      "gate_size": "narrow",
+      "origin": "ORD",
+      "sched_arr": "2024-07-15T16:12:00",
+      "sched_min": 12,
+      "eta_earliest_min": 12,
+      "airborne": false,
+      "disrupted": false,
+      "delays": {
+        "weather": 0,
+        "late_aircraft": 0,
+        "nas": 0,
+        "carrier": 0,
+        "arr_delay": 0
+      },
+      "fuel": {
+        "extra_min": 30,
+        "alternate": "BHM",
+        "alternate_min": 35,
+        "final_reserve_min": 30
+      },
+      "connections": [
+        {
+          "flight": "DL900",
+          "pax": 12,
+          "departs_min": 72
+        }
+      ],
+      "scheduled_gate": "B1",
+      "crew_shift_end_min": 102,
+      "next_departure_min": 62,
+      "provenance": [
+        {
+          "layer": "flights",
+          "status": "real",
+          "source": "test fixture",
+          "detail": null
+        }
+      ]
+    }
+  ],
+  "gates": [
+    {
+      "id": "A1",
+      "size": "narrow",
+      "pier": "A",
+      "remote": false,
+      "busy": []
+    },
+    {
+      "id": "A2",
+      "size": "narrow",
+      "pier": "A",
+      "remote": false,
+      "busy": []
+    },
+    {
+      "id": "A5",
+      "size": "wide",
+      "pier": "A",
+      "remote": false,
+      "busy": []
+    },
+    {
+      "id": "B1",
+      "size": "narrow",
+      "pier": "B",
+      "remote": false,
+      "busy": []
+    },
+    {
+      "id": "B2",
+      "size": "narrow",
+      "pier": "B",
+      "remote": false,
+      "busy": [
+        {
+          "from_min": 0,
+          "to_min": 40,
+          "label": "DL55"
+        }
+      ]
+    },
+    {
+      "id": "B5",
+      "size": "wide",
+      "pier": "B",
+      "remote": false,
+      "busy": []
+    },
+    {
+      "id": "RS",
+      "size": "wide",
+      "pier": "R",
+      "remote": true,
+      "busy": []
+    }
+  ],
+  "provenance": [
+    {
+      "layer": "weather",
+      "status": "real",
+      "source": "test fixture",
+      "detail": null
+    }
+  ],
+  "severity": null
+}
