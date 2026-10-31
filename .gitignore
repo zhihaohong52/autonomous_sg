@@ -7,3 +7,4 @@ eval/decisions.jsonl
 .env
 *.swp
 .env.*
+__pycache__/
