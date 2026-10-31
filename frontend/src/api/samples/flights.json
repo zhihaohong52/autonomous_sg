@@ -1,0 +1,44 @@
+{
+  "flights": [
+    {
+      "row_id": 70,
+      "wave_id": "F2015-70",
+      "date": "2015-01-01",
+      "carrier": "AA",
+      "flight": "AA1298",
+      "origin": "DFW",
+      "dest": "ATL",
+      "sched_arr": "21:20",
+      "arr_delay": 112,
+      "weather_delay": 0,
+      "late_aircraft_delay": 81
+    },
+    {
+      "row_id": 142,
+      "wave_id": "F2015-142",
+      "date": "2015-01-01",
+      "carrier": "AA",
+      "flight": "AA2396",
+      "origin": "DFW",
+      "dest": "ATL",
+      "sched_arr": "22:50",
+      "arr_delay": 86,
+      "weather_delay": 5,
+      "late_aircraft_delay": 71
+    },
+    {
+      "row_id": 201,
+      "wave_id": "F2015-201",
+      "date": "2015-01-01",
+      "carrier": "DL",
+      "flight": "DL754",
+      "origin": "PIT",
+      "dest": "ATL",
+      "sched_arr": "19:23",
+      "arr_delay": 68,
+      "weather_delay": 0,
+      "late_aircraft_delay": 67
+    }
+  ],
+  "total": 18504
+}

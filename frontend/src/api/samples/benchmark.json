@@ -1,0 +1,291 @@
+{
+  "generated_at": "2026-10-31T05:14:04+00:00",
+  "n_waves": 50,
+  "n_common": 50,
+  "seed": 7,
+  "arms": [
+    {
+      "model": "typesafe/jev-1.14",
+      "provider": "openrouter",
+      "label": "typesafe/jev-1.14",
+      "summary": {
+        "consensus_rate_pct": 98.0,
+        "mean_rounds": 1.08,
+        "fallback_rate_pct": 2.0,
+        "rule_violations_in_agreed_plans": 0,
+        "delay_min": 493.71,
+        "fuel_kg": 113.49,
+        "pax_protected_pct": 28.772,
+        "overtime_min": 0.0,
+        "agreement_with_formula_pct": 40.0,
+        "brier": 0.0216,
+        "latency_p50_ms": 486.0,
+        "latency_p95_ms": 638.8,
+        "error_rate_pct": 0.0,
+        "cost_usd_per_wave": 0.0
+      },
+      "delay_min_vs_feasible_status_quo": 507.869,
+      "n_ok": 50,
+      "failed_ids": [],
+      "p95_all_ms": 638.8,
+      "model_decisions": 783
+    },
+    {
+      "model": "liquid/d1-ultra",
+      "provider": "openrouter",
+      "label": "liquid/d1-ultra",
+      "summary": {
+        "consensus_rate_pct": 96.0,
+        "mean_rounds": 1.1,
+        "fallback_rate_pct": 4.0,
+        "rule_violations_in_agreed_plans": 0,
+        "delay_min": 494.774,
+        "fuel_kg": 173.12,
+        "pax_protected_pct": 28.586,
+        "overtime_min": 0.0,
+        "agreement_with_formula_pct": 68.0,
+        "brier": 0.0048,
+        "latency_p50_ms": 639.0,
+        "latency_p95_ms": 1104.6,
+        "error_rate_pct": 0.0,
+        "cost_usd_per_wave": 0.0
+      },
+      "delay_min_vs_feasible_status_quo": 507.869,
+      "n_ok": 50,
+      "failed_ids": [],
+      "p95_all_ms": 1104.6,
+      "model_decisions": 769
+    },
+    {
+      "model": "baseten/elephant-1",
+      "provider": "openrouter",
+      "label": "baseten/elephant-1",
+      "summary": {
+        "consensus_rate_pct": 86.0,
+        "mean_rounds": 1.32,
+        "fallback_rate_pct": 14.0,
+        "rule_violations_in_agreed_plans": 0,
+        "delay_min": 490.984,
+        "fuel_kg": 113.22,
+        "pax_protected_pct": 28.81,
+        "overtime_min": 0.0,
+        "agreement_with_formula_pct": 28.0,
+        "brier": 0.0051,
+        "latency_p50_ms": 574.0,
+        "latency_p95_ms": 1275.8,
+        "error_rate_pct": 0.0,
+        "cost_usd_per_wave": 0.0
+      },
+      "delay_min_vs_feasible_status_quo": 509.012,
+      "n_ok": 50,
+      "failed_ids": [],
+      "p95_all_ms": 1275.8,
+      "model_decisions": 787
+    },
+    {
+      "model": "formula",
+      "provider": "formula",
+      "label": "formula",
+      "summary": {
+        "consensus_rate_pct": 98.0,
+        "mean_rounds": 1.06,
+        "fallback_rate_pct": 2.0,
+        "rule_violations_in_agreed_plans": 0,
+        "delay_min": 489.49,
+        "fuel_kg": 89.19,
+        "pax_protected_pct": 29.116,
+        "overtime_min": 0.0,
+        "agreement_with_formula_pct": 100.0,
+        "brier": null,
+        "latency_p50_ms": null,
+        "latency_p95_ms": null,
+        "error_rate_pct": 0.0,
+        "cost_usd_per_wave": 0.0
+      },
+      "delay_min_vs_feasible_status_quo": 507.75,
+      "n_ok": 50,
+      "failed_ids": [],
+      "p95_all_ms": 0.0,
+      "model_decisions": 0
+    }
+  ],
+  "baseline": {
+    "delay_min": 485.084,
+    "fuel_kg": 129.83,
+    "pax_protected_pct": 29.11,
+    "overtime_min": 0.14,
+    "diversions": 0.0,
+    "n_feasible": 42,
+    "infeasible_ids": [
+      "ATL-2024-07-24-19",
+      "BNA-2024-07-07-21",
+      "BNA-2024-07-15-18",
+      "DCA-2024-06-11-21",
+      "FLL-2024-07-10-20",
+      "LAS-2024-07-27-19",
+      "MCO-2024-07-23-16",
+      "ORD-2024-06-23-14"
+    ],
+    "feasible_only": {
+      "delay_min": 513.095,
+      "fuel_kg": 66.429,
+      "pax_protected_pct": 26.757,
+      "overtime_min": 0.0,
+      "diversions": 0.0
+    }
+  },
+  "ablation_no_engine_unsafe_pct": 16.0,
+  "outage_test": {
+    "primary_disabled": "invalid/model-does-not-exist",
+    "waves": 0,
+    "resolved": 0,
+    "fallbacks_used": {}
+  },
+  "selection": {
+    "winner": "formula",
+    "rule": "best outcome with error < 2% and p95 < 1 s; tie -> lower Brier",
+    "reasons": [
+      "typesafe/jev-1.14 is worse than formula on delay (493.71 > 489.49 min) and not better on pax protected: formula selected.",
+      "typesafe/jev-1.14 meets both thresholds and has the best outcome among qualifying arms.",
+      "Brier is measured against the formula verdict (y = 1 if utility >= reservation), not ground truth.",
+      "cost_usd_per_wave = 0.0: output tokens free; input cost not measured.",
+      "fallback_rate_pct = % of waves ending in the deterministic solver; error_rate_pct = % of decisions answered after this arm failed (a failed wave counts as one error decision).",
+      "typesafe/jev-1.14 p95 all decisions incl. fallbacks: 638.8 ms",
+      "liquid/d1-ultra p95 all decisions incl. fallbacks: 1104.6 ms",
+      "liquid/d1-ultra missed p95 < 1000 ms: 1104.6 ms",
+      "baseten/elephant-1 p95 all decisions incl. fallbacks: 1275.8 ms",
+      "baseten/elephant-1 missed p95 < 1000 ms: 1275.8 ms",
+      "Mean delay: typesafe/jev-1.14 493.71 min vs formula 489.49 min vs status quo 485.084 min.",
+      "outage test skipped (no model winner)"
+    ]
+  },
+  "failures": [
+    {
+      "wave_id": "SAN-2024-07-09-22",
+      "model": "typesafe/jev-1.14",
+      "reason": "regression vs status quo: delay 205.0 > 204.0 min"
+    },
+    {
+      "wave_id": "MCO-2024-07-23-16",
+      "model": "typesafe/jev-1.14",
+      "reason": "no consensus: deterministic solver fallback"
+    },
+    {
+      "wave_id": "SAN-2024-07-09-22",
+      "model": "liquid/d1-ultra",
+      "reason": "regression vs status quo: delay 205.0 > 204.0 min"
+    },
+    {
+      "wave_id": "MCO-2024-07-23-16",
+      "model": "liquid/d1-ultra",
+      "reason": "no consensus: deterministic solver fallback"
+    },
+    {
+      "wave_id": "DCA-2024-06-11-21",
+      "model": "liquid/d1-ultra",
+      "reason": "no consensus: deterministic solver fallback"
+    },
+    {
+      "wave_id": "SAN-2024-07-09-22",
+      "model": "baseten/elephant-1",
+      "reason": "regression vs status quo: delay 205.0 > 204.0 min"
+    },
+    {
+      "wave_id": "LAS-2024-07-27-19",
+      "model": "baseten/elephant-1",
+      "reason": "no consensus: deterministic solver fallback"
+    },
+    {
+      "wave_id": "FLL-2024-07-10-20",
+      "model": "baseten/elephant-1",
+      "reason": "no consensus: deterministic solver fallback"
+    },
+    {
+      "wave_id": "ORD-2024-06-23-14",
+      "model": "baseten/elephant-1",
+      "reason": "no consensus: deterministic solver fallback"
+    },
+    {
+      "wave_id": "BNA-2024-07-07-21",
+      "model": "baseten/elephant-1",
+      "reason": "no consensus: deterministic solver fallback"
+    },
+    {
+      "wave_id": "MCO-2024-07-23-16",
+      "model": "baseten/elephant-1",
+      "reason": "no consensus: deterministic solver fallback"
+    },
+    {
+      "wave_id": "ATL-2024-07-24-19",
+      "model": "baseten/elephant-1",
+      "reason": "no consensus: deterministic solver fallback"
+    },
+    {
+      "wave_id": "BNA-2024-07-15-18",
+      "model": "baseten/elephant-1",
+      "reason": "no consensus: deterministic solver fallback"
+    },
+    {
+      "wave_id": "SAN-2024-07-09-22",
+      "model": "formula",
+      "reason": "regression vs status quo: delay 205.0 > 204.0 min"
+    },
+    {
+      "wave_id": "MCO-2024-07-23-16",
+      "model": "formula",
+      "reason": "no consensus: deterministic solver fallback"
+    }
+  ],
+  "wave_ids": [
+    "DCA-2024-06-22-16",
+    "DTW-2024-07-22-23",
+    "ATL-2024-06-15-18",
+    "LAS-2024-07-27-19",
+    "AUS-2024-06-09-18",
+    "SAN-2024-07-09-22",
+    "PHL-2024-06-11-19",
+    "MDW-2024-06-06-00",
+    "ORD-2024-06-23-14",
+    "FLL-2024-07-10-20",
+    "EWR-2024-06-20-23",
+    "JFK-2024-07-06-16",
+    "BWI-2024-07-19-12",
+    "SFO-2024-08-19-23",
+    "BNA-2024-07-07-21",
+    "LGA-2024-06-27-19",
+    "CLT-2024-08-14-15",
+    "LAX-2024-06-15-11",
+    "MIA-2024-06-28-21",
+    "SEA-2024-06-27-16",
+    "PHX-2024-08-05-19",
+    "SLC-2024-07-19-15",
+    "TPA-2024-08-03-20",
+    "DEN-2024-07-03-19",
+    "IAH-2024-06-28-20",
+    "MSP-2024-08-19-20",
+    "BOS-2024-07-12-20",
+    "MCO-2024-07-23-16",
+    "IAD-2024-07-10-21",
+    "DFW-2024-08-12-18",
+    "DCA-2024-06-11-21",
+    "DTW-2024-07-19-15",
+    "ATL-2024-07-24-19",
+    "LAS-2024-07-17-17",
+    "AUS-2024-07-28-20",
+    "SAN-2024-07-24-19",
+    "PHL-2024-07-29-19",
+    "MDW-2024-08-25-19",
+    "ORD-2024-06-30-23",
+    "FLL-2024-07-17-22",
+    "EWR-2024-07-15-18",
+    "JFK-2024-06-29-21",
+    "BWI-2024-07-12-19",
+    "SFO-2024-07-19-15",
+    "BNA-2024-07-15-18",
+    "LGA-2024-08-07-22",
+    "CLT-2024-07-07-17",
+    "LAX-2024-06-14-00",
+    "MIA-2024-07-08-21",
+    "SEA-2024-06-03-20"
+  ]
+}

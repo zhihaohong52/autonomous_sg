@@ -20,13 +20,15 @@
       "id": "liquid/d1-ultra",
       "provider": "openrouter",
       "label": "Liquid d1-ultra",
-      "available": true
+      "available": true,
+      "benchmark_rank": 2
     },
     {
       "id": "baseten/elephant-1",
       "provider": "openrouter",
       "label": "Baseten elephant-1",
-      "available": true
+      "available": true,
+      "benchmark_rank": 3
     },
     {
       "id": "typesafe/jev",
@@ -38,11 +40,12 @@
       "id": "formula",
       "provider": "formula",
       "label": "Formula (deterministic)",
-      "available": true
+      "available": true,
+      "benchmark_rank": 1
     }
   ],
   "default_model": "liquid/d1-ultra",
   "llm_available": true,
   "tracing": false,
-  "replay_available": false
+  "replay_available": true
 }

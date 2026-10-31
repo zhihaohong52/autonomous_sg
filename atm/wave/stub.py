@@ -15,7 +15,7 @@ _REPLAY_DIR = Path(__file__).resolve().parents[2] / "data" / "replay"
 
 def _fixture_wave() -> Wave:
     from .fixtures import make_wave
-    return make_wave()
+    return make_wave(focus="DL100")
 
 
 def _summary(w: Wave) -> dict:
@@ -72,44 +72,79 @@ def _eval(plan: JointPlan, feasible: bool = True) -> dict:
                        "hold_min": 10.0, "pax_protected_pct": 100.0, "overtime_min": 0.0, "diversions": 0}}
 
 
+def _vote(plan: JointPlan, who: str, accept: bool = True, util: float = 0.7, res: float = 0.5) -> dict:
+    return {"plan_id": plan.id, "vote": "ACCEPT" if accept else "REJECT", "utility": util, "reservation": res,
+            "reason": f"{who} utility {util} {'>=' if accept else '<'} reservation {res} (stub)"}
+
+
 def negotiate_wave(wave: Wave, mode: str, chain: list[str] | None = None, on_message=None) -> dict:
     t0 = time.time()
     chain = chain or ["formula"]
     model = chain[0]
-    provider = "formula" if model == "formula" else model.split(":", 1)[0]
     log: list[dict] = []
+    fmeta = {"kind": "formula", "model": "formula", "provider": "formula", "latency_ms": 1}
 
     def emit(rnd, sender, typ, body, rationale, dec=True):
         msg = {"seq": len(log), "round": rnd, "ts": datetime.now(timezone.utc).isoformat(),
                "sender": sender, "type": typ, "body": {"type": typ, **body}, "rationale": rationale}
         if dec:
-            msg["decision"] = {"kind": "formula", "model": "formula", "provider": "formula", "latency_ms": 1}
+            msg["decision"] = dict(fmeta)
         log.append(msg)
         if on_message:
             on_message(msg)
         time.sleep(0.05)
 
+    focus = wave.focus or wave.flights[0].callsign
+    pilot = f"PILOT:{focus}"
+    agents = ["ATC", pilot, "GROUND"]
     base = _plan(wave)
     final = _plan(wave, shift=1)
-    cs = wave.flights[0].callsign
-    mv = Move("m1", "ATC", "shift_slot", [cs], {"minutes": 1}, f"Shift {cs} slot +1")
-    bad = Move("m2", f"PILOT:{cs}", "speed_reduction", [cs], {"minutes": 9}, f"{cs} slow 9 min")
-    emit(0, "DECIDER", "TRIAGE", {"score": 0.6, "levels": ["low", "medium", "high"],
+    mv = Move("m1", "ATC", "shift_slot", [focus], {"minutes": 1}, f"Shift {focus} slot +1")
+    bad = Move("m2", pilot, "speed_reduction", [focus], {"minutes": 9}, f"{focus} slow 9 min")
+    viol = RuleCheck("PLT-EARLIEST-ETA", "PILOT", False, "speed reduction 9 > 8 min cap", "ops rule",
+                     {"minutes": 9, "limit": 8}, focus).to_dict()
+
+    def turn(agent, role, moves, rejected, why):
+        return {"turn": 1, "agent": agent, "role": role, "moves": moves, "rejected": rejected,
+                "proposal": final.to_dict(), "proposal_utility": 0.7, "votes": [_vote(final, agent)],
+                "rationale": why, "decision": dict(fmeta)}
+
+    def check(by):
+        return {"plan_id": final.id, "passed": True, "violations": [], "proposed_by": by}
+
+    emit(0, "DECIDER", "TRIAGE", {"score": 2, "levels": ["low", "medium", "high"],
                                   "probabilities": [0.1, 0.3, 0.6]}, "Disrupted heavy arrival; high severity.")
-    emit(0, "ATC", "OPEN", {"plan": base.to_dict(), "evaluation": _eval(base)}, "FCFS opening plan.")
-    emit(1, "ATC", "MOVE", {"move": mv.__dict__, "plan": final.to_dict(), "options_count": 4}, "Smooths the queue.")
-    emit(1, f"PILOT:{cs}", "MOVE_REJECTED",
-         {"move": bad.__dict__, "violations": [RuleCheck("PLT-EARLIEST-ETA", "PILOT", False,
-                                                         "speed reduction 9 > 8 min cap", "ops rule",
-                                                         {"minutes": 9, "limit": 8}, cs).to_dict()]},
-         "Engine vetoed an out-of-range speed reduction.", dec=False)
-    emit(1, "GROUND", "COUNTER", {"plan": final.to_dict(), "evaluation": _eval(final)}, "Keeps gates as scheduled.")
-    emit(1, "ENGINE", "CHECK", {"plan_id": final.id, "passed": True, "violations": []}, "All rules pass.", dec=False)
-    emit(1, "ATC", "VOTE", {"votes": [{"plan_id": final.id, "decision": "ACCEPT", "utility": 0.7,
-                                       "reservation": 0.5, "reason": "Above reservation."}]}, "Accepts.")
-    emit(1, "ENGINE", "CONSENSUS", {"plan_id": final.id, "accepted_by": ["ATC", "GROUND"]}, "All agents accept.",
-         dec=False)
+    emit(0, "ENGINE", "OPEN", {"plan": base.to_dict(), "evaluation": _eval(base), "agents": agents,
+                               "focus": focus}, "FCFS opening plan.", dec=False)
+    emit(1, "ATC", "AGENT_TURN",
+         turn("ATC", "ATC", [{"move": mv.__dict__, "utility_before": 0.6, "utility_after": 0.7,
+                              "decision": dict(fmeta)}], [], "Smooths the queue."), "Smooths the queue.")
+    emit(1, "ENGINE", "CHECK", check("ATC"), "All rules pass.", dec=False)
+    emit(1, pilot, "AGENT_TURN",
+         turn(pilot, "PILOT", [], [{"move": bad.__dict__, "violations": [viol],
+                                    "reason": "speed reduction 9 > 8 min cap", "decision": dict(fmeta)}],
+              "Engine vetoed an out-of-range speed reduction; accepts ATC's plan."),
+         "Engine vetoed an out-of-range speed reduction.")
+    emit(1, "ENGINE", "CHECK", check(pilot), "All rules pass.", dec=False)
+    emit(1, "GROUND", "AGENT_TURN", turn("GROUND", "GROUND", [], [], "Keeps gates as scheduled."),
+         "Keeps gates as scheduled.")
+    emit(1, "ENGINE", "CHECK", check("GROUND"), "All rules pass.", dec=False)
+    emit(1, "ENGINE", "CONSENSUS", {"plan_id": final.id, "accepted_by": agents, "turn": 1},
+         "All 3 agents accept.", dec=False)
+    fa = next(a for a in final.assignments if a.callsign == focus)
+    fl = next(f for f in wave.flights if f.callsign == focus)
+    hh = lambda m: f"16:{int(m):02d}"   # noqa: E731  (fixture window starts 16:00)
+    revision = {"callsign": focus, "action": "land", "revised_arrival": hh(fa.slot_min),
+                "revised_arrival_min": fa.slot_min, "revised_arrival_t": f"T+{fa.slot_min}",
+                "runway": fa.runway, "gate": fa.gate, "scheduled_arrival": hh(fl.sched_min),
+                "scheduled_gate": fl.scheduled_gate, "speed_reduction_min": 0, "ground_delay_min": 0,
+                "hold_min": fa.metrics.hold_min, "delay_vs_schedule_min": fa.slot_min - fl.sched_min,
+                "summary": f"{focus} lands {hh(fa.slot_min)} local (T+{fa.slot_min}) on runway {fa.runway}, "
+                           f"gate {fa.gate}; +{fa.slot_min - fl.sched_min} min vs schedule"}
+    limits = [{"limit": "wake separation (same runway)", "value": "stub", "source": "assumption",
+               "note": "stub backend: no workbook limits"}]
     return {"run_id": "", "wave_id": wave.id, "mode": mode, "model": model, "outcome": "consensus", "rounds": 1,
+            "turns": 1, "agents": agents, "focus": focus, "revision": revision, "limits": limits,
             "final_plan": final.to_dict(), "evaluation": _eval(final),
             "baseline": {"plan": base.to_dict(), "evaluation": _eval(base)},
             "narration": None, "model_errors": [],

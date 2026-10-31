@@ -1,280 +1,665 @@
 {
-  "id": "ATL-2024-07-15-16",
+  "id": "F2015-270287",
   "airport": {
-    "iata": "ATL",
-    "icao": "KATL",
-    "name": "Hartsfield-Jackson Atlanta Intl",
-    "lat": 33.64,
-    "lon": -84.43,
+    "iata": "ORD",
+    "icao": "KORD",
+    "name": "Chicago O'Hare International Airport",
+    "lat": 41.9796,
+    "lon": -87.90446,
     "runways": [
       {
-        "id": "08L",
-        "heading_true": 94,
-        "length_ft": 9000,
-        "open": true,
-        "closed_reason": null,
-        "le_lat": null,
-        "le_lon": null,
-        "he_lat": null,
-        "he_lon": null
+        "id": "04L",
+        "heading_true": 39.0,
+        "length_ft": 7500,
+        "open": false,
+        "closed_reason": "tailwind 9.5 kt > 5 kt (FAA Order 8400.9 \u00a76d (dry))",
+        "le_lat": 41.9817008972168,
+        "le_lon": -87.91390228271484,
+        "he_lat": 41.997501373291016,
+        "he_lon": -87.89640045166016
       },
       {
-        "id": "26R",
-        "heading_true": 274,
-        "length_ft": 9000,
+        "id": "04R",
+        "heading_true": 42.0,
+        "length_ft": 8075,
+        "open": false,
+        "closed_reason": "tailwind 9.3 kt > 5 kt (FAA Order 8400.9 \u00a76d (dry))",
+        "le_lat": 41.95330047607422,
+        "le_lon": -87.89939880371094,
+        "he_lat": 41.96989822387695,
+        "he_lon": -87.87979888916016
+      },
+      {
+        "id": "09C",
+        "heading_true": 90.0,
+        "length_ft": 11245,
         "open": true,
         "closed_reason": null,
-        "le_lat": null,
-        "le_lon": null,
-        "he_lat": null,
-        "he_lon": null
+        "le_lat": 41.98831,
+        "le_lon": -87.931584,
+        "he_lat": 41.988326,
+        "he_lon": -87.890211
+      },
+      {
+        "id": "09L",
+        "heading_true": 90.0,
+        "length_ft": 7500,
+        "open": true,
+        "closed_reason": null,
+        "le_lat": 42.002830505371094,
+        "le_lon": -87.92667388916016,
+        "he_lat": 42.002830505371094,
+        "he_lon": -87.89908599853516
       },
       {
         "id": "09R",
-        "heading_true": 94,
-        "length_ft": 9000,
+        "heading_true": 90.0,
+        "length_ft": 11260,
         "open": true,
         "closed_reason": null,
-        "le_lat": null,
-        "le_lon": null,
-        "he_lat": null,
-        "he_lon": null
+        "le_lat": 41.98389816,
+        "le_lon": -87.91835022,
+        "he_lat": 41.98389816,
+        "he_lon": -87.88905334
+      },
+      {
+        "id": "10C",
+        "heading_true": 90.0,
+        "length_ft": 10800,
+        "open": true,
+        "closed_reason": null,
+        "le_lat": 41.96569824,
+        "le_lon": -87.9315033,
+        "he_lat": 41.96569824,
+        "he_lon": -87.89179993
+      },
+      {
+        "id": "10L",
+        "heading_true": 90.0,
+        "length_ft": 13000,
+        "open": true,
+        "closed_reason": null,
+        "le_lat": 41.96900177001953,
+        "le_lon": -87.93150329589844,
+        "he_lat": 41.96910095214844,
+        "he_lon": -87.88369750976562
+      },
+      {
+        "id": "10R",
+        "heading_true": 90.0,
+        "length_ft": 7500,
+        "open": true,
+        "closed_reason": null,
+        "le_lat": 41.95719909667969,
+        "le_lon": -87.92790222167969,
+        "he_lat": 41.957244873046875,
+        "he_lon": -87.9002914428711
+      },
+      {
+        "id": "22L",
+        "heading_true": 222.0,
+        "length_ft": 8075,
+        "open": true,
+        "closed_reason": null,
+        "le_lat": 41.96989822387695,
+        "le_lon": -87.87979888916016,
+        "he_lat": 41.95330047607422,
+        "he_lon": -87.89939880371094
+      },
+      {
+        "id": "22R",
+        "heading_true": 219.0,
+        "length_ft": 7500,
+        "open": true,
+        "closed_reason": null,
+        "le_lat": 41.997501373291016,
+        "le_lon": -87.89640045166016,
+        "he_lat": 41.9817008972168,
+        "he_lon": -87.91390228271484
+      },
+      {
+        "id": "27C",
+        "heading_true": 270.0,
+        "length_ft": 11245,
+        "open": true,
+        "closed_reason": null,
+        "le_lat": 41.988326,
+        "le_lon": -87.890211,
+        "he_lat": 41.98831,
+        "he_lon": -87.931584
       },
       {
         "id": "27L",
-        "heading_true": 274,
-        "length_ft": 9000,
+        "heading_true": 270.0,
+        "length_ft": 11260,
         "open": true,
         "closed_reason": null,
-        "le_lat": null,
-        "le_lon": null,
-        "he_lat": null,
-        "he_lon": null
+        "le_lat": 41.98389816,
+        "le_lon": -87.88905334,
+        "he_lat": 41.98389816,
+        "he_lon": -87.91835022
+      },
+      {
+        "id": "27R",
+        "heading_true": 270.0,
+        "length_ft": 7500,
+        "open": true,
+        "closed_reason": null,
+        "le_lat": 42.002830505371094,
+        "le_lon": -87.89908599853516,
+        "he_lat": 42.002830505371094,
+        "he_lon": -87.92667388916016
+      },
+      {
+        "id": "28C",
+        "heading_true": 270.0,
+        "length_ft": 10800,
+        "open": true,
+        "closed_reason": null,
+        "le_lat": 41.96569824,
+        "le_lon": -87.89179993,
+        "he_lat": 41.96569824,
+        "he_lon": -87.9315033
+      },
+      {
+        "id": "28L",
+        "heading_true": 270.0,
+        "length_ft": 7500,
+        "open": true,
+        "closed_reason": null,
+        "le_lat": 41.957244873046875,
+        "le_lon": -87.9002914428711,
+        "he_lat": 41.95719909667969,
+        "he_lon": -87.92790222167969
+      },
+      {
+        "id": "28R",
+        "heading_true": 270.0,
+        "length_ft": 13000,
+        "open": true,
+        "closed_reason": null,
+        "le_lat": 41.96910095214844,
+        "le_lon": -87.88369750976562,
+        "he_lat": 41.96900177001953,
+        "he_lon": -87.93150329589844
       }
     ]
   },
-  "window_start": "2024-07-15T16:00:00",
+  "window_start": "2015-08-19T08:00:00",
   "metar": {
-    "raw": "KATL 151551Z 27015KT 10SM FEW040 30/20 A2992",
-    "station": "KATL",
-    "observed_at": "2024-07-15T15:51:00Z",
-    "wind_dir_deg": 270,
-    "wind_kt": 15,
+    "raw": "KORD 191251Z 20010KT 10SM BKN016 BKN028 BKN075 22/19 A2966 RMK AO2 SLP039 T02220194",
+    "station": "ORD",
+    "observed_at": "2015-08-19T12:51:00Z",
+    "wind_dir_deg": 200.0,
+    "wind_kt": 10.0,
     "gust_kt": null,
-    "visibility_sm": 10,
-    "ceiling_ft": null,
+    "visibility_sm": 10.0,
+    "ceiling_ft": 1600.0,
     "wx_codes": [],
     "surface": "dry"
   },
-  "runway_wind": [],
+  "runway_wind": [
+    {
+      "runway": "04L",
+      "headwind_kt": 0.0,
+      "crosswind_kt": 3.3,
+      "tailwind_kt": 9.5,
+      "limit_crosswind_kt": 20.0,
+      "limit_tailwind_kt": 5.0,
+      "limit_source": "FAA Order 8400.9 \u00a76d (dry)",
+      "within_limits": false
+    },
+    {
+      "runway": "04R",
+      "headwind_kt": 0.0,
+      "crosswind_kt": 3.7,
+      "tailwind_kt": 9.3,
+      "limit_crosswind_kt": 20.0,
+      "limit_tailwind_kt": 5.0,
+      "limit_source": "FAA Order 8400.9 \u00a76d (dry)",
+      "within_limits": false
+    },
+    {
+      "runway": "09C",
+      "headwind_kt": 0.0,
+      "crosswind_kt": 9.4,
+      "tailwind_kt": 3.4,
+      "limit_crosswind_kt": 20.0,
+      "limit_tailwind_kt": 5.0,
+      "limit_source": "FAA Order 8400.9 \u00a76d (dry)",
+      "within_limits": true
+    },
+    {
+      "runway": "09L",
+      "headwind_kt": 0.0,
+      "crosswind_kt": 9.4,
+      "tailwind_kt": 3.4,
+      "limit_crosswind_kt": 20.0,
+      "limit_tailwind_kt": 5.0,
+      "limit_source": "FAA Order 8400.9 \u00a76d (dry)",
+      "within_limits": true
+    },
+    {
+      "runway": "09R",
+      "headwind_kt": 0.0,
+      "crosswind_kt": 9.4,
+      "tailwind_kt": 3.4,
+      "limit_crosswind_kt": 20.0,
+      "limit_tailwind_kt": 5.0,
+      "limit_source": "FAA Order 8400.9 \u00a76d (dry)",
+      "within_limits": true
+    },
+    {
+      "runway": "10C",
+      "headwind_kt": 0.0,
+      "crosswind_kt": 9.4,
+      "tailwind_kt": 3.4,
+      "limit_crosswind_kt": 20.0,
+      "limit_tailwind_kt": 5.0,
+      "limit_source": "FAA Order 8400.9 \u00a76d (dry)",
+      "within_limits": true
+    },
+    {
+      "runway": "10L",
+      "headwind_kt": 0.0,
+      "crosswind_kt": 9.4,
+      "tailwind_kt": 3.4,
+      "limit_crosswind_kt": 20.0,
+      "limit_tailwind_kt": 5.0,
+      "limit_source": "FAA Order 8400.9 \u00a76d (dry)",
+      "within_limits": true
+    },
+    {
+      "runway": "10R",
+      "headwind_kt": 0.0,
+      "crosswind_kt": 9.4,
+      "tailwind_kt": 3.4,
+      "limit_crosswind_kt": 20.0,
+      "limit_tailwind_kt": 5.0,
+      "limit_source": "FAA Order 8400.9 \u00a76d (dry)",
+      "within_limits": true
+    },
+    {
+      "runway": "22L",
+      "headwind_kt": 9.3,
+      "crosswind_kt": 3.7,
+      "tailwind_kt": 0.0,
+      "limit_crosswind_kt": 20.0,
+      "limit_tailwind_kt": 5.0,
+      "limit_source": "FAA Order 8400.9 \u00a76d (dry)",
+      "within_limits": true
+    },
+    {
+      "runway": "22R",
+      "headwind_kt": 9.5,
+      "crosswind_kt": 3.3,
+      "tailwind_kt": 0.0,
+      "limit_crosswind_kt": 20.0,
+      "limit_tailwind_kt": 5.0,
+      "limit_source": "FAA Order 8400.9 \u00a76d (dry)",
+      "within_limits": true
+    },
+    {
+      "runway": "27C",
+      "headwind_kt": 3.4,
+      "crosswind_kt": 9.4,
+      "tailwind_kt": 0.0,
+      "limit_crosswind_kt": 20.0,
+      "limit_tailwind_kt": 5.0,
+      "limit_source": "FAA Order 8400.9 \u00a76d (dry)",
+      "within_limits": true
+    },
+    {
+      "runway": "27L",
+      "headwind_kt": 3.4,
+      "crosswind_kt": 9.4,
+      "tailwind_kt": 0.0,
+      "limit_crosswind_kt": 20.0,
+      "limit_tailwind_kt": 5.0,
+      "limit_source": "FAA Order 8400.9 \u00a76d (dry)",
+      "within_limits": true
+    },
+    {
+      "runway": "27R",
+      "headwind_kt": 3.4,
+      "crosswind_kt": 9.4,
+      "tailwind_kt": 0.0,
+      "limit_crosswind_kt": 20.0,
+      "limit_tailwind_kt": 5.0,
+      "limit_source": "FAA Order 8400.9 \u00a76d (dry)",
+      "within_limits": true
+    },
+    {
+      "runway": "28C",
+      "headwind_kt": 3.4,
+      "crosswind_kt": 9.4,
+      "tailwind_kt": 0.0,
+      "limit_crosswind_kt": 20.0,
+      "limit_tailwind_kt": 5.0,
+      "limit_source": "FAA Order 8400.9 \u00a76d (dry)",
+      "within_limits": true
+    },
+    {
+      "runway": "28L",
+      "headwind_kt": 3.4,
+      "crosswind_kt": 9.4,
+      "tailwind_kt": 0.0,
+      "limit_crosswind_kt": 20.0,
+      "limit_tailwind_kt": 5.0,
+      "limit_source": "FAA Order 8400.9 \u00a76d (dry)",
+      "within_limits": true
+    },
+    {
+      "runway": "28R",
+      "headwind_kt": 3.4,
+      "crosswind_kt": 9.4,
+      "tailwind_kt": 0.0,
+      "limit_crosswind_kt": 20.0,
+      "limit_tailwind_kt": 5.0,
+      "limit_source": "FAA Order 8400.9 \u00a76d (dry)",
+      "within_limits": true
+    }
+  ],
   "queue": [
     {
-      "callsign": "WN1",
-      "aircraft_type": "B737",
+      "callsign": "MQ3309",
+      "aircraft_type": null,
       "wake": "LARGE",
-      "runway": "26R",
-      "slot_min": 2
-    },
-    {
-      "callsign": "DL7",
-      "aircraft_type": "A321",
-      "wake": "LARGE",
-      "runway": "27L",
-      "slot_min": 4
-    },
-    {
-      "callsign": "F99",
-      "aircraft_type": "A320",
-      "wake": "LARGE",
-      "runway": "26R",
-      "slot_min": 10
+      "runway": "22R",
+      "slot_min": -43.0
     }
   ],
   "flights": [
     {
-      "callsign": "DL100",
-      "carrier": "DL",
-      "airline": "DL",
-      "flight_no": 100,
-      "tail": null,
-      "aircraft_type": "B772",
-      "wake": "HEAVY",
-      "gate_size": "wide",
-      "origin": "ORD",
-      "sched_arr": "2024-07-15T16:05:00",
-      "sched_min": 5,
-      "eta_earliest_min": 5,
+      "callsign": "MQ3327",
+      "carrier": "MQ",
+      "airline": "American Eagle Airlines Inc.",
+      "flight_no": 3327,
+      "tail": "N660MQ",
+      "aircraft_type": null,
+      "wake": "LARGE",
+      "gate_size": "narrow",
+      "origin": "DBQ",
+      "sched_arr": "2015-08-19T07:30:00",
+      "sched_min": -30.0,
+      "eta_earliest_min": -30.0,
+      "airborne": true,
+      "disrupted": false,
+      "delays": {
+        "weather": 331.0,
+        "late_aircraft": 0.0,
+        "nas": 0.0,
+        "carrier": 0.0,
+        "arr_delay": 331.0
+      },
+      "fuel": {
+        "extra_min": 45,
+        "alternate": "MDW",
+        "alternate_min": 11,
+        "final_reserve_min": 30
+      },
+      "connections": [
+        {
+          "flight": "MQ1305",
+          "pax": 36,
+          "departs_min": 65.0
+        },
+        {
+          "flight": "MQ1757",
+          "pax": 33,
+          "departs_min": 68.0
+        }
+      ],
+      "scheduled_gate": "B18",
+      "crew_shift_end_min": 133.8391463034689,
+      "next_departure_min": 47.0,
+      "provenance": [
+        {
+          "layer": "flights",
+          "status": "real",
+          "source": "real (DOT 2015 flights.csv)",
+          "detail": "airborne inferred from scheduled departure vs window start; DOT times are local"
+        },
+        {
+          "layer": "aircraft",
+          "status": "generic",
+          "source": "assumed narrow-body",
+          "detail": "tail not in FAA registry"
+        },
+        {
+          "layer": "fuel",
+          "status": "simulated",
+          "source": "challenge2_operational_constraints.xlsx (synthetic planning limits)",
+          "detail": "spare fuel on arrival = 45 min holding; final reserve 30 min"
+        },
+        {
+          "layer": "crew",
+          "status": "simulated",
+          "source": "challenge2_operational_constraints.xlsx (synthetic planning limits)",
+          "detail": "ground shift 8 h, elapsed at sched arrival 316 min (seeded), floored at earliest turnaround end; flight crew report = sched dep - 60 min, 13 h duty ends T+630 min"
+        },
+        {
+          "layer": "connections",
+          "status": "simulated",
+          "source": "seeded model",
+          "detail": null
+        }
+      ]
+    },
+    {
+      "callsign": "MQ3318",
+      "carrier": "MQ",
+      "airline": "American Eagle Airlines Inc.",
+      "flight_no": 3318,
+      "tail": "N527MQ",
+      "aircraft_type": null,
+      "wake": "LARGE",
+      "gate_size": "narrow",
+      "origin": "XNA",
+      "sched_arr": "2015-08-19T07:49:00",
+      "sched_min": -11.0,
+      "eta_earliest_min": -11.0,
+      "airborne": true,
+      "disrupted": false,
+      "delays": {
+        "weather": 40.0,
+        "late_aircraft": 0.0,
+        "nas": 0.0,
+        "carrier": 0.0,
+        "arr_delay": 40.0
+      },
+      "fuel": {
+        "extra_min": 45,
+        "alternate": "MDW",
+        "alternate_min": 11,
+        "final_reserve_min": 30
+      },
+      "connections": [
+        {
+          "flight": "MQ536",
+          "pax": 20,
+          "departs_min": 52.0
+        },
+        {
+          "flight": "MQ1364",
+          "pax": 22,
+          "departs_min": 66.0
+        }
+      ],
+      "scheduled_gate": "B17",
+      "crew_shift_end_min": 291.07678543503096,
+      "next_departure_min": 40.0,
+      "provenance": [
+        {
+          "layer": "flights",
+          "status": "real",
+          "source": "real (DOT 2015 flights.csv)",
+          "detail": "airborne inferred from scheduled departure vs window start; DOT times are local"
+        },
+        {
+          "layer": "aircraft",
+          "status": "generic",
+          "source": "assumed narrow-body",
+          "detail": "tail not in FAA registry"
+        },
+        {
+          "layer": "fuel",
+          "status": "simulated",
+          "source": "challenge2_operational_constraints.xlsx (synthetic planning limits)",
+          "detail": "spare fuel on arrival = 45 min holding; final reserve 30 min"
+        },
+        {
+          "layer": "crew",
+          "status": "simulated",
+          "source": "challenge2_operational_constraints.xlsx (synthetic planning limits)",
+          "detail": "ground shift 8 h, elapsed at sched arrival 178 min (seeded), floored at earliest turnaround end; flight crew report = sched dep - 60 min, 13 h duty ends T+600 min"
+        },
+        {
+          "layer": "connections",
+          "status": "simulated",
+          "source": "seeded model",
+          "detail": null
+        }
+      ]
+    },
+    {
+      "callsign": "OO5559",
+      "carrier": "OO",
+      "airline": "Skywest Airlines Inc.",
+      "flight_no": 5559,
+      "tail": "N107SY",
+      "aircraft_type": "E170",
+      "wake": "LARGE",
+      "gate_size": "narrow",
+      "origin": "ATL",
+      "sched_arr": "2015-08-19T08:05:00",
+      "sched_min": 5.0,
+      "eta_earliest_min": 5.0,
       "airborne": true,
       "disrupted": true,
       "delays": {
-        "weather": 40,
-        "late_aircraft": 0,
-        "nas": 0,
-        "carrier": 0,
-        "arr_delay": 40
+        "weather": 57.0,
+        "late_aircraft": 0.0,
+        "nas": 0.0,
+        "carrier": 0.0,
+        "arr_delay": 57.0
       },
       "fuel": {
-        "extra_min": 30,
-        "alternate": "BHM",
-        "alternate_min": 35,
+        "extra_min": 45,
+        "alternate": "MDW",
+        "alternate_min": 11,
         "final_reserve_min": 30
       },
       "connections": [
         {
-          "flight": "DL900",
-          "pax": 12,
-          "departs_min": 65
+          "flight": "OO317",
+          "pax": 40,
+          "departs_min": 49.0
         }
       ],
-      "scheduled_gate": "A5",
-      "crew_shift_end_min": 95,
-      "next_departure_min": 55,
+      "scheduled_gate": "B18",
+      "crew_shift_end_min": 82.47680658293643,
+      "next_departure_min": 114.0,
       "provenance": [
         {
           "layer": "flights",
           "status": "real",
-          "source": "test fixture",
+          "source": "real (DOT 2015 flights.csv)",
+          "detail": "airborne inferred from scheduled departure vs window start; DOT times are local"
+        },
+        {
+          "layer": "aircraft",
+          "status": "real",
+          "source": "FAA registry (current)",
+          "detail": "EMBRAER S A ERJ 170-200 LR"
+        },
+        {
+          "layer": "fuel",
+          "status": "simulated",
+          "source": "challenge2_operational_constraints.xlsx (synthetic planning limits)",
+          "detail": "spare fuel on arrival = 45 min holding; final reserve 30 min"
+        },
+        {
+          "layer": "crew",
+          "status": "simulated",
+          "source": "challenge2_operational_constraints.xlsx (synthetic planning limits)",
+          "detail": "ground shift 8 h, elapsed at sched arrival 403 min (seeded), floored at earliest turnaround end; flight crew report = sched dep - 60 min, 13 h duty ends T+660 min"
+        },
+        {
+          "layer": "connections",
+          "status": "simulated",
+          "source": "seeded model",
           "detail": null
         }
       ]
     },
     {
-      "callsign": "DL201",
-      "carrier": "DL",
-      "airline": "DL",
-      "flight_no": 201,
-      "tail": null,
-      "aircraft_type": "A321",
+      "callsign": "OO5570",
+      "carrier": "OO",
+      "airline": "Skywest Airlines Inc.",
+      "flight_no": 5570,
+      "tail": "N121SY",
+      "aircraft_type": "E170",
       "wake": "LARGE",
       "gate_size": "narrow",
-      "origin": "ORD",
-      "sched_arr": "2024-07-15T16:06:00",
-      "sched_min": 6,
-      "eta_earliest_min": 6,
+      "origin": "DFW",
+      "sched_arr": "2015-08-19T08:26:00",
+      "sched_min": 26.0,
+      "eta_earliest_min": 26.0,
       "airborne": true,
       "disrupted": false,
       "delays": {
-        "weather": 0,
-        "late_aircraft": 0,
-        "nas": 0,
-        "carrier": 0,
-        "arr_delay": 0
+        "weather": 80.0,
+        "late_aircraft": 0.0,
+        "nas": 0.0,
+        "carrier": 0.0,
+        "arr_delay": 80.0
       },
       "fuel": {
-        "extra_min": 30,
-        "alternate": "BHM",
-        "alternate_min": 35,
+        "extra_min": 45,
+        "alternate": "MDW",
+        "alternate_min": 11,
         "final_reserve_min": 30
       },
       "connections": [
         {
-          "flight": "DL900",
-          "pax": 12,
-          "departs_min": 66
+          "flight": "OO1823",
+          "pax": 27,
+          "departs_min": 122.0
         }
       ],
-      "scheduled_gate": "A1",
-      "crew_shift_end_min": 96,
-      "next_departure_min": 56,
+      "scheduled_gate": "B16",
+      "crew_shift_end_min": 383.2701109435688,
+      "next_departure_min": 145.0,
       "provenance": [
         {
           "layer": "flights",
           "status": "real",
-          "source": "test fixture",
-          "detail": null
-        }
-      ]
-    },
-    {
-      "callsign": "AA302",
-      "carrier": "AA",
-      "airline": "AA",
-      "flight_no": 302,
-      "tail": null,
-      "aircraft_type": "B738",
-      "wake": "LARGE",
-      "gate_size": "narrow",
-      "origin": "ORD",
-      "sched_arr": "2024-07-15T16:08:00",
-      "sched_min": 8,
-      "eta_earliest_min": 8,
-      "airborne": true,
-      "disrupted": false,
-      "delays": {
-        "weather": 0,
-        "late_aircraft": 0,
-        "nas": 0,
-        "carrier": 0,
-        "arr_delay": 0
-      },
-      "fuel": {
-        "extra_min": 16,
-        "alternate": "BHM",
-        "alternate_min": 35,
-        "final_reserve_min": 30
-      },
-      "connections": [
+          "source": "real (DOT 2015 flights.csv)",
+          "detail": "airborne inferred from scheduled departure vs window start; DOT times are local"
+        },
         {
-          "flight": "DL900",
-          "pax": 12,
-          "departs_min": 68
-        }
-      ],
-      "scheduled_gate": "A2",
-      "crew_shift_end_min": 98,
-      "next_departure_min": 58,
-      "provenance": [
-        {
-          "layer": "flights",
+          "layer": "aircraft",
           "status": "real",
-          "source": "test fixture",
-          "detail": null
-        }
-      ]
-    },
-    {
-      "callsign": "UA403",
-      "carrier": "UA",
-      "airline": "UA",
-      "flight_no": 403,
-      "tail": null,
-      "aircraft_type": "A320",
-      "wake": "LARGE",
-      "gate_size": "narrow",
-      "origin": "ORD",
-      "sched_arr": "2024-07-15T16:12:00",
-      "sched_min": 12,
-      "eta_earliest_min": 12,
-      "airborne": false,
-      "disrupted": false,
-      "delays": {
-        "weather": 0,
-        "late_aircraft": 0,
-        "nas": 0,
-        "carrier": 0,
-        "arr_delay": 0
-      },
-      "fuel": {
-        "extra_min": 30,
-        "alternate": "BHM",
-        "alternate_min": 35,
-        "final_reserve_min": 30
-      },
-      "connections": [
+          "source": "FAA registry (current)",
+          "detail": "EMBRAER S A ERJ 170-200 LR"
+        },
         {
-          "flight": "DL900",
-          "pax": 12,
-          "departs_min": 72
-        }
-      ],
-      "scheduled_gate": "B1",
-      "crew_shift_end_min": 102,
-      "next_departure_min": 62,
-      "provenance": [
+          "layer": "fuel",
+          "status": "simulated",
+          "source": "challenge2_operational_constraints.xlsx (synthetic planning limits)",
+          "detail": "spare fuel on arrival = 45 min holding; final reserve 30 min"
+        },
         {
-          "layer": "flights",
-          "status": "real",
-          "source": "test fixture",
+          "layer": "crew",
+          "status": "simulated",
+          "source": "challenge2_operational_constraints.xlsx (synthetic planning limits)",
+          "detail": "ground shift 8 h, elapsed at sched arrival 123 min (seeded), floored at earliest turnaround end; flight crew report = sched dep - 60 min, 13 h duty ends T+600 min"
+        },
+        {
+          "layer": "connections",
+          "status": "simulated",
+          "source": "seeded model",
           "detail": null
         }
       ]
@@ -282,52 +667,142 @@
   ],
   "gates": [
     {
-      "id": "A1",
+      "id": "M9",
       "size": "narrow",
-      "pier": "A",
+      "pier": "M",
       "remote": false,
-      "busy": []
+      "busy": [
+        {
+          "from_min": -60,
+          "to_min": 50,
+          "label": "other-flight (simulated)"
+        }
+      ]
     },
     {
-      "id": "A2",
-      "size": "narrow",
-      "pier": "A",
-      "remote": false,
-      "busy": []
-    },
-    {
-      "id": "A5",
-      "size": "wide",
-      "pier": "A",
-      "remote": false,
-      "busy": []
-    },
-    {
-      "id": "B1",
-      "size": "narrow",
-      "pier": "B",
-      "remote": false,
-      "busy": []
-    },
-    {
-      "id": "B2",
+      "id": "B22",
       "size": "narrow",
       "pier": "B",
       "remote": false,
       "busy": [
         {
-          "from_min": 0,
-          "to_min": 40,
-          "label": "DL55"
+          "from_min": -60,
+          "to_min": 27,
+          "label": "other-flight (simulated)"
         }
       ]
     },
     {
-      "id": "B5",
-      "size": "wide",
+      "id": "B21",
+      "size": "narrow",
+      "pier": "B",
+      "remote": false,
+      "busy": [
+        {
+          "from_min": -60,
+          "to_min": 70,
+          "label": "other-flight (simulated)"
+        }
+      ]
+    },
+    {
+      "id": "B20",
+      "size": "narrow",
+      "pier": "B",
+      "remote": false,
+      "busy": [
+        {
+          "from_min": -60,
+          "to_min": 72,
+          "label": "other-flight (simulated)"
+        }
+      ]
+    },
+    {
+      "id": "B19",
+      "size": "narrow",
+      "pier": "B",
+      "remote": false,
+      "busy": [
+        {
+          "from_min": -60,
+          "to_min": 21,
+          "label": "other-flight (simulated)"
+        }
+      ]
+    },
+    {
+      "id": "B18",
+      "size": "narrow",
       "pier": "B",
       "remote": false,
       "busy": []
+    },
+    {
+      "id": "B17",
+      "size": "narrow",
+      "pier": "B",
+      "remote": false,
+      "busy": []
+    },
+    {
+      "id": "B16",
+      "size": "narrow",
+      "pier": "B",
+      "remote": false,
+      "busy": [
+        {
+          "from_min": -60,
+          "to_min": 22,
+          "label": "other-flight (simulated)"
+        }
+      ]
+    },
+    {
+      "id": "B15",
+      "size": "narrow",
+      "pier": "B",
+      "remote": false,
+      "busy": [
+        {
+          "from_min": -60,
+          "to_min": 65,
+          "label": "other-flight (simulated)"
+        }
+      ]
+    },
+    {
+      "id": "B14",
+      "size": "narrow",
+      "pier": "B",
+      "remote": false,
+      "busy": [
+        {
+          "from_min": -60,
+          "to_min": 53,
+          "label": "other-flight (simulated)"
+        }
+      ]
+    },
+    {
+      "id": "W1",
+      "size": "wide",
+      "pier": "W",
+      "remote": false,
+      "busy": []
+    },
+    {
+      "id": "W2",
+      "size": "wide",
+      "pier": "W",
+      "remote": false,
+      "busy": [
+        {
+          "from_min": -60,
+          "to_min": 42,
+          "label": "other-flight (simulated)"
+        }
+      ]
     },
     {
       "id": "RS",
@@ -339,11 +814,42 @@
   ],
   "provenance": [
     {
+      "layer": "flights",
+      "status": "real",
+      "source": "real (DOT 2015 flights.csv)",
+      "detail": "row 270287"
+    },
+    {
+      "layer": "queue",
+      "status": "real",
+      "source": "real (DOT 2015 flights.csv)",
+      "detail": null
+    },
+    {
+      "layer": "runways",
+      "status": "real",
+      "source": "OurAirports",
+      "detail": null
+    },
+    {
       "layer": "weather",
       "status": "real",
-      "source": "test fixture",
-      "detail": null
+      "source": "IEM METAR",
+      "detail": "KORD 191251Z 20010KT 10SM BKN016 BKN028 BKN075 22/19 A2966 RMK AO2 SLP039 T02220194"
+    },
+    {
+      "layer": "gates",
+      "status": "simulated",
+      "source": "challenge2_operational_constraints.xlsx (synthetic planning limits)",
+      "detail": "Large hub: 4 runways, 150 gates (wave uses 12), 90 ops/h, turnaround 45 min, 3 spare gates; gate names from OpenStreetMap; W1/W2 simulated wide-body gates"
+    },
+    {
+      "layer": "gate_occupancy",
+      "status": "simulated",
+      "source": "challenge2_operational_constraints.xlsx (synthetic planning limits)",
+      "detail": "only 3 gates free at window start; seed=F2015-270287"
     }
   ],
-  "severity": null
+  "severity": null,
+  "focus": "OO5559"
 }
