@@ -44,7 +44,7 @@ export function Benchmark() {
         <div className="grid">
           <section className="card span-12">
             <div className="card-head"><h2>Model arms</h2><span className="meta">Status quo: {rep.baseline.delay_min.toFixed(1)} min delay · {rep.baseline.pax_protected_pct.toFixed(1)}% pax protected · {rep.baseline.fuel_kg} kg hold fuel</span></div>
-            <div className="table-wrap">
+            <div className="table-wrap" tabIndex={0} role="region" aria-label="Model arms">
               <table>
                 <thead><tr><th>Model</th>{COLS.map((c) => <th key={c.key} className="num">{c.label}</th>)}</tr></thead>
                 <tbody>

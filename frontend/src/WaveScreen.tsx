@@ -7,7 +7,7 @@ import { Checks, Outcome, PlanTable, Sources, Weather } from "./components/Panel
 import { clock, dateLabel } from "./format";
 
 type Status = "idle" | "running" | "done" | "error";
-type Decision = { kind: "APPROVE" | "OVERRIDE"; at: string; note?: string } | null;
+type Decision = { kind: "APPROVE" | "OVERRIDE"; at: string; note?: string; offline: boolean } | null;
 const MODE_LABEL: Record<Mode, string> = { formulas: "Formulas", decision: "Decision models", "decision+claude": "Decision models + Claude brief" };
 
 export function WaveScreen() {
@@ -31,10 +31,13 @@ export function WaveScreen() {
   const [note, setNote] = useState("");
   const [deciding, setDeciding] = useState(false);
   const abort = useRef<AbortController | null>(null);
+  const tableRef = useRef<JointPlan | null>(null);        // the table plan at the moment a message arrives
+  const showTable = (p: JointPlan | null) => { tableRef.current = p; setTable(p); };
+  useEffect(() => () => abort.current?.abort(), []);
 
   const loadWave = useCallback(async (id: string) => {
     abort.current?.abort();
-    setStatus("idle"); setMessages([]); setTable(null); setResult(null); setRejection(null); setRunErr(null);
+    setStatus("idle"); setMessages([]); showTable(null); setResult(null); setRejection(null); setRunErr(null);
     setDecision(null); setOverriding(false); setNote(""); setView("plan");
     try { setWave(await api.wave(id)); setLoadErr(null); history.replaceState(null, "", `#/wave/${id}`); }
     catch (e) { setLoadErr(`Couldn't load wave ${id}: ${(e as Error).message}`); }
@@ -56,30 +59,31 @@ export function WaveScreen() {
     if (!wave) return;
     abort.current?.abort();
     const ctl = new AbortController(); abort.current = ctl;
-    setStatus("running"); setMessages([]); setTable(null); setResult(null); setRejection(null); setRunErr(null); setDecision(null); setView("plan");
+    setStatus("running"); setMessages([]); showTable(null); setResult(null); setRejection(null); setRunErr(null); setDecision(null); setView("plan");
+    let ended = false;
     try {
       await api.negotiate({ wave_id: wave.id, mode, model: mode === "formulas" ? undefined : model, replay }, (ev) => {
         if (ev.event === "message") {
           const m = ev.data;
           setMessages((xs) => [...xs, m]);
           const b = m.body;
-          if (b.type === "OPEN" || b.type === "MOVE" || b.type === "COUNTER") setTable(b.plan);
+          if (b.type === "OPEN" || b.type === "MOVE" || b.type === "COUNTER") showTable(b.plan);
           if (b.type === "MOVE_REJECTED") {
             const cs = b.move.callsigns[0];
-            setTable((t) => {
-              setRejection({ seq: m.seq, move: b.move, violations: b.violations, runway: t?.assignments.find((a) => a.callsign === cs)?.runway });
-              return t;
-            });
+            setRejection({ seq: m.seq, move: b.move, violations: b.violations, runway: tableRef.current?.assignments.find((a) => a.callsign === cs)?.runway });
           }
         } else if (ev.event === "result") {
-          setResult(ev.data); setTable(ev.data.final_plan); setRejection(null); setStatus("done");
+          ended = true;
+          setResult(ev.data); showTable(ev.data.final_plan); setRejection(null); setStatus("done");
           if (ev.data.log) setMessages(ev.data.log);
         } else if (ev.event === "error") {
+          ended = true;
           setRunErr(ev.data.message); setStatus("error");
         }
       }, ctl.signal);
-      setStatus((s) => (s === "running" ? "error" : s));
-      setRunErr((e) => e ?? null);
+      if (!ended && !ctl.signal.aborted) {               // the stream closed without a result or an error event
+        setRunErr("The negotiation stream ended before a result arrived."); setStatus("error");
+      }
     } catch (e) {
       if ((e as Error).name === "AbortError") return;
       setRunErr((e as Error).message); setStatus("error");
@@ -91,7 +95,7 @@ export function WaveScreen() {
     setDeciding(true);
     try {
       const r = await api.decision({ run_id: result.run_id, decision: kind, note: kind === "OVERRIDE" ? note.trim() : undefined });
-      setDecision({ kind, at: r.recorded_at, note: note.trim() || undefined }); setOverriding(false);
+      setDecision({ kind, at: r.recorded_at, note: note.trim() || undefined, offline: isOffline() }); setOverriding(false);
     } catch (e) { setRunErr(`Decision not recorded: ${(e as Error).message}`); }
     finally { setDeciding(false); }
   };
@@ -124,11 +128,12 @@ export function WaveScreen() {
           <p className="product">Disruption Negotiator · {wave.airport.name}</p>
           <h1>{wave.airport.iata} arrivals {clock(wave.window_start, 0)}–{clock(wave.window_start, 60)}, {dateLabel(wave.window_start)}</h1>
           <p className="sub">{summary}</p>
+          <p className="sr-only" aria-live="polite">{status === "running" ? `Negotiating, round ${round} of 3` : status === "done" ? "Negotiation finished. The plan is ready to approve or override." : status === "error" ? `Negotiation failed. ${runErr ?? ""}` : ""}</p>
         </div>
         <div className="actions">
           {decision ? (
             <span className={`pill ${decision.kind === "APPROVE" ? "pos" : "warn"}`}>
-              {decision.kind === "APPROVE" ? "Approved" : "Overridden"} {new Date(decision.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} · logged
+              {decision.kind === "APPROVE" ? "Approved" : "Overridden"} {new Date(decision.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} · {decision.offline ? "offline demo, not logged" : "logged"}
             </span>
           ) : (
             <>
@@ -142,7 +147,7 @@ export function WaveScreen() {
       {overriding && !decision && (
         <div className="card decide" style={{ marginBottom: "var(--gap)" }}>
           <label htmlFor="note" style={{ fontWeight: 500 }}>Why are you overriding this plan?</label>
-          <textarea id="note" value={note} onChange={(e) => setNote(e.target.value)} aria-describedby="note-help"
+          <textarea id="note" required aria-required="true" value={note} onChange={(e) => setNote(e.target.value)} aria-describedby="note-help"
             placeholder="For example: holding DL2384 at A14, DL1490 is now leaving at 16:30" />
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
             <span id="note-help" className="muted" style={{ fontSize: 12 }}>The note is required and is logged with the run.</span>
@@ -185,6 +190,7 @@ export function WaveScreen() {
         <button className="btn" onClick={negotiate} disabled={status === "running"}>
           {status === "running" ? `Negotiating, round ${round}…` : status === "idle" ? "Start negotiation" : "Run again"}
         </button>
+        {mode === "decision+claude" && config && !config.llm_available && <span className="muted" style={{ fontSize: 12 }}>Claude not configured: the brief uses a template</span>}
         {isOffline() && <span className="pill warn">Offline demo: backend not reachable</span>}
       </div>
 
@@ -203,7 +209,7 @@ export function WaveScreen() {
             <Gantt wave={wave} plan={shown} rejection={view === "plan" ? rejection : null} />
             <div style={{ display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap", marginTop: 10 }}>
               <GanttLegend />
-              <span className="reject-note" style={{ marginTop: 0 }} aria-live="assertive">
+              <span className="reject-note" style={{ marginTop: 0 }} aria-live="polite">
                 {rejection && status === "running" ? `Vetoed: ${rejection.move.label}. ${rejection.violations[0]?.detail ?? ""}` : ""}
               </span>
             </div>

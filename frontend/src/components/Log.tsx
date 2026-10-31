@@ -46,7 +46,7 @@ export function Log({ messages, running, pilots = [] }: { messages: NegotiationM
   }
   const rounds = [...new Set(messages.map((m) => m.round))];
   return (
-    <div className="log" ref={box} aria-live="polite">
+    <div className="log" ref={box}>
       {rounds.map((r) => (
         <section key={r}>
           <h3 className="round-h">{ROUND[r] ?? `Round ${r}`}</h3>

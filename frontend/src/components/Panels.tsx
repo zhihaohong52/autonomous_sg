@@ -35,7 +35,7 @@ const provShort = (p: Provenance[]) => {
 export function PlanTable({ wave, plan, baseline }: { wave: WaveScenario; plan: JointPlan | null; baseline: JointPlan | null }) {
   const c = (m: number | null | undefined) => (m == null ? "—" : clock(wave.window_start, m));
   return (
-    <div className="table-wrap">
+    <div className="table-wrap" tabIndex={0} role="region" aria-label="Plan per flight">
       <table>
         <thead>
           <tr>
@@ -95,8 +95,8 @@ export function Checks({ wave, ev, base }: { wave: WaveScenario; ev: PlanEvaluat
       </div>
       {!e ? <p className="empty">Every plan is checked against 9 deterministic rules for every flight. The checks appear once the agents have a plan.</p> : (
         <>
-          <div className="table-wrap">
-            <table className="matrix">
+          <div className="table-wrap" tabIndex={0} role="region" aria-label="Safety rule checks">
+            <table className="matrix" aria-label="Safety rule checks by flight">
               <thead><tr><th>Rule</th>{wave.flights.map((f) => <th key={f.callsign} className="code">{f.callsign}</th>)}</tr></thead>
               <tbody>
                 {RULES.map((r) => (

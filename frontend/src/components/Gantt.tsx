@@ -28,12 +28,12 @@ export function Gantt({ wave, plan, rejection }: { wave: WaveScenario; plan: Joi
   }
 
   return (
-    <div className="gantt-wrap">
+    <div className="gantt-wrap" tabIndex={0} role="region" aria-label="Runway and gate timeline, scrolls sideways on small screens">
       <svg className="gantt" viewBox={`0 0 ${W} ${H}`} width="100%" role="img"
         aria-label={`Runway and gate timeline, ${clock(wave.window_start, 0)} to ${clock(wave.window_start, SPAN)}`}>
         {ticks.map((t) => (
           <g key={t}>
-            <line x1={x(t)} x2={x(t)} y1={AXIS - 4} y2={H} stroke="#222224" />
+            <line x1={x(t)} x2={x(t)} y1={AXIS - 4} y2={H} stroke="var(--gridline)" />
             <text x={x(t)} y={12} textAnchor={t === 0 ? "start" : t === SPAN ? "end" : "middle"}>{clock(wave.window_start, t)}</text>
           </g>
         ))}
@@ -41,12 +41,12 @@ export function Gantt({ wave, plan, rejection }: { wave: WaveScenario; plan: Joi
         {runways.map((r) => {
           const y = yRwy(r.id);
           return (
-            <g key={r.id} opacity={r.open ? 1 : 0.55}>
-              <text className="lane-label" x={0} y={y + 14}>{r.id}</text>
+            <g key={r.id}>
+              <text className="lane-label" x={0} y={y + 14} style={r.open ? undefined : { fill: "var(--muted)" }}>{r.id}</text>
               {!r.open && (
                 <>
                   <rect x={x(0)} y={y + 4} width={x(SPAN) - x(0)} height={BAR} fill="url(#hatch)" rx={3} />
-                  <text x={x(0) + 8} y={y + 16} style={{ fill: "#bdbdc0" }}>Closed · {r.closed_reason}</text>
+                  <text x={x(0) + 8} y={y + 16} style={{ fill: "var(--soft)" }}>Closed · {r.closed_reason}</text>
                 </>
               )}
               {wave.queue.filter((q) => q.runway === r.id).map((q) => (
@@ -103,7 +103,7 @@ export function Gantt({ wave, plan, rejection }: { wave: WaveScenario; plan: Joi
         )}
         <defs>
           <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-            <line x1="0" y1="0" x2="0" y2="6" stroke="#2a292e" strokeWidth="3" />
+            <line x1="0" y1="0" x2="0" y2="6" stroke="var(--hatch)" strokeWidth="3" />
           </pattern>
         </defs>
       </svg>
