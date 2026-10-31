@@ -14,10 +14,10 @@
   --soft: #bdbdc0;
   --accent: #f2c230;          /* taxiway-sign yellow: selection lines and the wave flights */
   --accent-dim: #8a7426;
-  --positive: #44a282;
+  --positive: #5aa95f;
   --negative: #e5566f;
   --warning: #d9a441;
-  --pill-positive-bg: #1b2828; --pill-positive-ink: #5fc39c;
+  --pill-positive-bg: #1d281d; --pill-positive-ink: #7cc57f;
   --pill-negative-bg: #2c1a20; --pill-negative-ink: #e5566f;
   --pill-warning-bg: #2a2416; --pill-warning-ink: #d9a441;
   --pill-neutral-bg: #212023; --pill-neutral-ink: #bdbdc0;
@@ -25,7 +25,7 @@
   --gridline: #222224;
   --hatch: #2a292e;
   --busy: #2a292e;
-  --agent-atc: #8fb8e8; --agent-pilot: #8fd4b0; --agent-ground: #e6ae8a; --agent-engine: #bdbdc0;
+  --agent-atc: #8fb8e8; --agent-pilot: #a9d49a; --agent-ground: #e6ae8a; --agent-engine: #bdbdc0;
   --shadow: 0 12px 28px rgba(0,0,0,.2);
   --radius-card: 6px;
   --radius-control: 999px;
@@ -77,7 +77,7 @@ p, li, dd, .msg-why, .brief, .msg-body { text-wrap-style: pretty; }
 /* ---------- title row ---------- */
 .titlerow { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--gap); margin-bottom: 20px; }
 .titlerow h1 { font-size: var(--fs-title); font-weight: 600; letter-spacing: -0.01em; line-height: 1.2; }
-.titlerow .sub { margin-top: 6px; font-size: 14px; color: var(--soft); max-width: 820px; }
+.titlerow .sub { margin-top: 6px; font-size: 14px; color: var(--soft); max-width: 68ch; }
 .titlerow .sub b { color: var(--text); font-weight: 500; }
 .product { font-size: var(--fs-small); color: var(--muted); margin-bottom: 4px; }
 .actions { display: flex; gap: 8px; align-items: center; flex: none; }
