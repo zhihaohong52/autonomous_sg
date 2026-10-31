@@ -1,4 +1,4 @@
-# Disruption Negotiator (Autonomous SG 2026, Airbus Challenge 2)
+# Final Approach: disruption negotiation for arrival waves (Autonomous SG 2026, Airbus Challenge 2)
 
 Design: `docs/superpowers/specs/2026-10-31-disruption-negotiator-design.md` · API contract: `docs/api-contract.md`
 

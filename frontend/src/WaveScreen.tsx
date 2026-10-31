@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, isOffline } from "./api/client";
 import type { Config, FlightRow, JointPlan, PlanEvaluation, Mode, NegotiationMessage, NegotiationResult, WaveScenario, WaveSummary } from "./api/types";
+import { AirportMap } from "./components/AirportMap";
 import { Gantt, GanttLegend, type Rejection } from "./components/Gantt";
 import { Log } from "./components/Log";
 import { Checks, Limits, Outcome, PlanTable, RevisionLine, Sources, Weather } from "./components/Panels";
@@ -301,7 +302,18 @@ export function WaveScreen() {
                 <Log messages={messages} running={status === "running"} focus={result?.focus ?? wave.focus} details={details} />
               </>
             )}
-            {tab === "data" && <><Limits limits={result?.limits ?? null} /><Weather wave={wave} /><Sources wave={wave} /></>}
+            {tab === "data" && (
+              <>
+                <div className="map-row">
+                  <section>
+                    <div className="card-head"><h3>{wave.airport.iata} runways and wind</h3><span className="meta">{result || table ? "Blue: runway ends the plan lands on" : "Before a plan"}</span></div>
+                    <AirportMap wave={wave} plan={view === "base" && result ? result.baseline.plan : table} />
+                  </section>
+                  <Weather wave={wave} />
+                </div>
+                <Limits limits={result?.limits ?? null} /><Sources wave={wave} />
+              </>
+            )}
           </div>
         </section>
       </div>
