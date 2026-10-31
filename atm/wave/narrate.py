@@ -10,14 +10,14 @@ import os
 from pydantic import BaseModel, Field
 
 MODEL = os.environ.get("NARRATION_MODEL", "claude-haiku-5-5")  # fast and cheap; it only explains
-MAX_WORDS = 120
+MAX_WORDS = 150
 MAX_LINES = 40
 KEY_TYPES = ("TRIAGE", "OPEN", "AGENT_TURN", "CHECK", "CONSENSUS", "NO_CONSENSUS", "FALLBACK",
              "MODEL_FALLBACK")
 
 
 class Narration(BaseModel):
-    brief: str = Field(description="At most 120 words for the hub duty manager: what was agreed, why, "
+    brief: str = Field(description="At most 110 words for the hub duty manager: what was agreed, why, "
                                    "risks, and what needs their approval.")
     lines: list[str] = Field(description="Plain-English transcript, one short line per key message, in order.")
 
@@ -25,7 +25,11 @@ class Narration(BaseModel):
 def _trim(text: str, n: int = MAX_WORDS) -> str:
     text = text.replace(" — ", ", ").replace("—", ", ")  # house style: no em dashes in the brief
     words = text.split()
-    return text.strip() if len(words) <= n else " ".join(words[:n]) + " …"
+    if len(words) <= n:
+        return text.strip()
+    cut = " ".join(words[:n])  # end on the last full sentence, never mid-sentence
+    end = max(cut.rfind(". "), cut.rfind("! "), cut.rfind("? "))
+    return cut[:end + 1] if end > 0 else cut + " …"
 
 
 def _key_messages(result: dict) -> list[dict]:
@@ -103,7 +107,7 @@ def brief(result: dict) -> dict:
         prompt = ("You narrate the outcome of an automated arrival-wave disruption negotiation between ATC, "
                   "pilot and ground agents at an airline hub. A deterministic safety engine checked every "
                   "plan; you explain, you do not decide or re-judge legality. Use only the facts below.\n"
-                  f"Write `brief` (at most {MAX_WORDS} words, for the hub duty manager: what was agreed, why, "
+                  f"Write `brief` (at most 110 words, for the hub duty manager: what was agreed, why, "
                   "risks, what needs their approval; compare with the status-quo baseline honestly, including "
                   "anything that got worse) and `lines` (plain English, one line per key message, in order).\n\n"
                   f"DATA: {payload}")

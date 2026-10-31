@@ -254,8 +254,8 @@ export function WaveScreen() {
             <h2>Runways and gates</h2>
             {result ? (
               <div className="seg" role="group" aria-label="Plan shown">
-                <button aria-pressed={view === "plan"} onClick={() => setView("plan")}>Agreed plan</button>
-                <button aria-pressed={view === "base"} onClick={() => setView("base")}>Status quo</button>
+                <button aria-pressed={view === "base"} onClick={() => setView("base")} title="Status quo: the schedule as it stood">Before</button>
+                <button aria-pressed={view === "plan"} onClick={() => setView("plan")} title="The plan the agents agreed">After</button>
               </div>
             ) : <span className="meta">{table ? proposalLabel : "Fixed traffic only, no plan yet"}</span>}
           </div>

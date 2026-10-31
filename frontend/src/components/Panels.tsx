@@ -90,10 +90,10 @@ export function Checks({ wave, ev, base }: { wave: WaveScenario; ev: PlanEvaluat
   return (
     <section>
       <div className="card-head">
-        <h3>{e ? `${e.checks.filter((c) => !c.passed).length ? `${e.checks.filter((c) => !c.passed).length} rule breach${e.checks.filter((c) => !c.passed).length === 1 ? "" : "es"}` : "Every rule passes"} in the ${which === "plan" ? "agreed plan" : "status quo"}` : "Eleven rules, every flight"}</h3>
+        <h3>{e ? `${e.checks.filter((c) => !c.passed).length ? `${e.checks.filter((c) => !c.passed).length} rule breach${e.checks.filter((c) => !c.passed).length === 1 ? "" : "es"}` : "Every rule passes"} ${which === "plan" ? "after" : "before"} negotiation` : "Twelve rules, every flight"}</h3>
         {ev && <div className="seg" role="group" aria-label="Plan to check">
-          <button aria-pressed={which === "plan"} onClick={() => { setWhich("plan"); setSel(null); }} disabled={!ev}>Agreed plan</button>
-          <button aria-pressed={which === "base"} onClick={() => { setWhich("base"); setSel(null); }} disabled={!base}>Status quo</button>
+          <button aria-pressed={which === "base"} onClick={() => { setWhich("base"); setSel(null); }} disabled={!base} title="Status quo: the schedule as it stood">Before</button>
+          <button aria-pressed={which === "plan"} onClick={() => { setWhich("plan"); setSel(null); }} disabled={!ev} title="The plan the agents agreed">After</button>
         </div>}
       </div>
       {!e ? <p className="empty">Every plan is checked against 11 deterministic rules for every flight. The checks appear once the agents have a plan.</p> : (
