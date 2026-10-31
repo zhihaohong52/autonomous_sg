@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js"></script>
+<style>
+:root { --bg:#0b0f14; --ink:#f4f6f8; --muted:#9aa7b4; --line:#2a3846; --blue:#4da3ff; --green:#3ecf8e; --amber:#f5b942; --violet:#b48cff; }
+* { margin:0; padding:0; box-sizing:border-box; }
+html,body { width:1920px; height:1080px; overflow:hidden; background:var(--bg); }
+#root { width:100%; height:100%; position:relative; font-family:"Inter",sans-serif; color:var(--ink); }
+#d { position:absolute; inset:0; }
+h1 { position:absolute; left:80px; top:50px; font-size:44px; font-weight:900; letter-spacing:-0.02em; }
+h1 span { color:var(--muted); font-weight:400; font-size:28px; margin-left:18px; }
+.b { position:absolute; border:2px solid var(--line); border-radius:16px; padding:18px 22px; background:#111821; }
+.b b { display:block; font-size:24px; margin-bottom:8px; }
+.b p { font-size:18px; color:var(--muted); line-height:1.4; }
+.k { font-size:15px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; margin-bottom:6px; }
+.grp { position:absolute; border:2px dashed var(--line); border-radius:22px; }
+.grp > .k { position:absolute; top:-12px; left:24px; background:var(--bg); padding:0 10px; }
+svg { position:absolute; inset:0; }
+</style></head><body>
+<div id="root" data-composition-id="main" data-start="0" data-duration="2" data-width="1920" data-height="1080">
+<div id="d" class="clip" data-start="0" data-duration="2" data-track-index="0" data-layout-allow-overlap>
+<h1>Final Approach<span>system architecture</span></h1>
+<svg viewBox="0 0 1920 1080"><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#6b7d8f"/></marker></defs>
+<g stroke="#6b7d8f" stroke-width="2.5" fill="none" marker-end="url(#a)">
+<path d="M400 330 L470 330"/><path d="M400 560 L470 400"/>
+<path d="M760 360 L830 360"/>
+<path d="M1120 250 L1190 250"/><path d="M1120 420 L1190 420"/>
+<path d="M1335 300 L1335 370"/>
+<path d="M1480 420 L1550 420"/><path d="M1480 520 L1550 640"/>
+<path d="M1700 480 L1700 590"/>
+<path d="M1700 760 L1700 830"/>
+<path d="M975 600 L975 520"/>
+</g></svg>
+
+<div class="grp" style="left:60px;top:150px;width:350px;height:600px"><div class="k" style="color:var(--blue)">Real data in</div></div>
+<div class="b" style="left:85px;top:185px;width:300px"><b>flights.csv row</b><p>DOT 2015 disrupted arrival: weather or late-aircraft delay</p></div>
+<div class="b" style="left:85px;top:345px;width:300px"><b>Airport world</b><p>OurAirports runways · OSM gates · IEM METAR at that hour</p></div>
+<div class="b" style="left:85px;top:505px;width:300px"><b>Workbook limits</b><p>wake, capacity, fuel, crew duty, gates · FAA crosswind</p></div>
+
+<div class="b" style="left:475px;top:270px;width:280px"><b>Wave builder</b><p>focus flight + the other arrivals in the window, triage severity</p></div>
+
+<div class="grp" style="left:820px;top:150px;width:680px;height:420px"><div class="k" style="color:var(--green)">LangGraph negotiation · max 3 turns</div></div>
+<div class="b" style="left:840px;top:185px;width:275px"><b>ATC → PILOT → GROUND</b><p>one structured message each per turn; moves only inside own authority</p></div>
+<div class="b" style="left:840px;top:360px;width:275px;border-color:var(--violet)"><div class="k" style="color:var(--violet)">Decision layer</div><p>code computes verdicts → <b style="display:inline;font-size:18px;color:var(--ink)">jev-1.14</b> picks a move and votes · chain d1-ultra → elephant-1 → formula</p></div>
+<div class="b" style="left:1195px;top:185px;width:285px;border-color:var(--green)"><div class="k" style="color:var(--green)">Rule engine</div><p>12 deterministic rules CHECK every move and plan; vetoes cite rule, source, values</p></div>
+<div class="b" style="left:1195px;top:375px;width:285px"><b>Consensus?</b><p>one legal plan accepted by all 3 agents</p></div>
+
+<div class="b" style="left:1555px;top:370px;width:300px;border-color:var(--green)"><b>Agreed plan</b><p>revised arrival time, runway, gate</p></div>
+<div class="b" style="left:1555px;top:595px;width:300px;border-color:var(--amber)"><div class="k" style="color:var(--amber)">No consensus after 3 turns</div><p>deterministic solver decides; reason logged</p></div>
+<div class="b" style="left:1555px;top:835px;width:300px"><b>Duty manager</b><p>approve or override (reason required) in the web UI</p></div>
+<div class="b" style="left:1240px;top:835px;width:290px;border-color:var(--blue)"><div class="k" style="color:var(--blue)">Claude Haiku 5.5</div><p>writes the brief from the log; decides nothing</p></div>
+
+<div class="b" style="left:820px;top:610px;width:620px"><div class="k" style="color:var(--muted)">Benchmark · picks the default</div><p>50 seeded rows (+1,000-row scale run): status quo, optimiser, formulas, 3 models · outage and engine-off tests</p></div>
+<div class="b" style="left:85px;top:835px;width:1100px"><div class="k" style="color:var(--muted)">Serving</div><p>FastAPI + SSE stream on Render · React UI · recorded replays · every limit returned with its source</p></div>
+</div></div>
+<script>const tl = gsap.timeline({ paused: true }); window.__timelines["main"] = tl; tl.seek(0);</script>
+</body></html>
