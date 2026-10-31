@@ -23,6 +23,7 @@ class Narration(BaseModel):
 
 
 def _trim(text: str, n: int = MAX_WORDS) -> str:
+    text = text.replace(" — ", ", ").replace("—", ", ")  # house style: no em dashes in the brief
     words = text.split()
     return text.strip() if len(words) <= n else " ".join(words[:n]) + " …"
 

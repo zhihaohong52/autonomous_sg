@@ -54,7 +54,7 @@ export function Benchmark() {
                 {[...models, { id: "status-quo", provider: "formula", label: "Status quo (first come, first served)", available: true } as ModelInfo].map((m) => (
                   <tr key={m.id}>
                     <td><span className="code">{m.label}</span><span className="sub">{m.id === "status-quo" ? "baseline" : m.provider}{m.available ? "" : " · unavailable"}</span></td>
-                    {COLS.map((c) => <td key={c.key} className="num muted">—</td>)}
+                    {COLS.map((c) => <td key={c.key} className="num muted">n/a</td>)}
                   </tr>
                 ))}
               </tbody>
@@ -74,7 +74,7 @@ export function Benchmark() {
                       <td><span className="code">{a.label}</span>{a.model === rep.selection.winner && <span className="pill pos" style={{ marginLeft: 8 }}>Selected</span>}<span className="sub">{a.provider}</span></td>
                       {COLS.map((c) => {
                         const v = a.summary[c.key];
-                        if (v == null) return <td key={c.key} className="num muted" title={a.provider === "formula" ? "The formula makes no model calls" : "No data for this arm"}>{a.provider === "formula" ? "n/a" : "—"}</td>;
+                        if (v == null) return <td key={c.key} className="num muted" title={a.provider === "formula" ? "The formula makes no model calls" : "No data for this arm"}>{a.provider === "formula" ? "n/a" : "n/a"}</td>;
                         const bad = c.key === "rule_violations_in_agreed_plans" && v > 0;
                         return <td key={c.key} className={`num${bad ? " neg" : ""}`}>{c.key === "cost_usd_per_wave" ? `$${v.toFixed(c.digits)}` : `${v.toFixed(c.digits)}${c.unit}`}</td>;
                       })}

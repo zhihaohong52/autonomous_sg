@@ -6,12 +6,12 @@ import { clock, signed } from "../format";
 export function Outcome({ ev, base }: { ev: PlanEvaluation | null; base: PlanEvaluation | null }) {
   const t = ev?.totals, b = base?.totals;
   const breaches = (e: PlanEvaluation | null) => (e ? e.checks.filter((c) => !c.passed).length : null);
-  const dash = <span className="muted">—</span>;
+  const dash = <span className="muted">n/a</span>;
   const cell = (label: string, value: React.ReactNode, unit: string, delta: React.ReactNode) => (
     <div className="kpi"><div className="label">{label}</div><div className="value">{value}{value !== dash && <small>{unit}</small>}</div><div className="delta">{delta}</div></div>
   );
   const vs = (now: number | undefined, then: number | undefined, unit: string, goodDown = true, digits = 0) => {
-    if (then == null) return <span className="muted">Status quo —</span>;
+    if (then == null) return <span className="muted">Status quo n/a</span>;
     if (now == null) return <span>Status quo {then.toFixed(digits)}{unit}</span>;
     const diff = +(now - then).toFixed(digits);
     const good = goodDown ? diff < 0 : diff > 0;
@@ -22,7 +22,7 @@ export function Outcome({ ev, base }: { ev: PlanEvaluation | null; base: PlanEva
       {cell("Total gate delay", t ? t.delay_min : dash, " min", vs(t?.delay_min, b?.delay_min, " min"))}
       {cell("Connecting pax protected", t ? t.pax_protected_pct.toFixed(1) : dash, "%", vs(t?.pax_protected_pct, b?.pax_protected_pct, "%", false, 1))}
       {cell("Holding fuel", t ? t.fuel_kg : dash, " kg", vs(t?.fuel_kg, b?.fuel_kg, " kg"))}
-      {cell("Safety rule breaches", ev ? breaches(ev) : dash, "", base ? <span>Status quo <span className={breaches(base) ? "neg" : ""}>{breaches(base)}</span></span> : <span className="muted">Status quo —</span>)}
+      {cell("Safety rule breaches", ev ? breaches(ev) : dash, "", base ? <span>Status quo <span className={breaches(base) ? "neg" : ""}>{breaches(base)}</span></span> : <span className="muted">Status quo n/a</span>)}
     </div>
   );
 }
@@ -35,7 +35,7 @@ const provShort = (p: Provenance[]) => {
 
 export function PlanTable({ wave, plan, baseline }: { wave: WaveScenario; plan: JointPlan | null; baseline: JointPlan | null }) {
   const focus = wave.focus;
-  const c = (m: number | null | undefined) => (m == null ? "—" : clock(wave.window_start, m));
+  const c = (m: number | null | undefined) => (m == null ? "n/a" : clock(wave.window_start, m));
   return (
     <div className="table-wrap" tabIndex={0} role="region" aria-label="Plan per flight">
       <table>
@@ -54,11 +54,11 @@ export function PlanTable({ wave, plan, baseline }: { wave: WaveScenario; plan: 
             return (
               <tr key={f.callsign}>
                 <td title={provShort(f.provenance)}><span className="code">{f.callsign}</span>{f.callsign === focus && <span className="pill" style={{ marginLeft: 8, height: 20 }}>Disruption flight</span>}<span className="sub">{f.aircraft_type ? `${f.aircraft_type} from` : "From"} {f.origin}{f.disrupted ? ` · ${Math.max(f.delays.weather, f.delays.late_aircraft)} min ${f.delays.weather >= f.delays.late_aircraft ? "weather" : "late aircraft"}` : ""}</span></td>
-                <td>{a ? <><span className="code">{a.action === "divert" ? "Divert" : a.runway}</span><span className="sub">{c(a.slot_min)}{a.metrics.hold_min ? ` · hold ${a.metrics.hold_min} min` : ""}{a.ground_delay_min ? ` · ${a.ground_delay_min} min at ${f.origin}` : ""}</span></> : <span className="muted">—</span>}</td>
+                <td>{a ? <><span className="code">{a.action === "divert" ? "Divert" : a.runway}</span><span className="sub">{c(a.slot_min)}{a.metrics.hold_min ? ` · hold ${a.metrics.hold_min} min` : ""}{a.ground_delay_min ? ` · ${a.ground_delay_min} min at ${f.origin}` : ""}</span></> : <span className="muted">n/a</span>}</td>
                 <td>{a ? <><span className="code">{a.gate}</span><span className="sub">{a.gate !== f.scheduled_gate ? `was ${f.scheduled_gate}` : "scheduled"}</span></> : <span className="code muted">{f.scheduled_gate}</span>}</td>
                 <td className="num">{a ? <>{c(a.metrics.in_block_min)}<span className="sub">{a.metrics.next_dep_delay_min ? `next dep ${a.metrics.next_dep_delay_min} min late` : "next dep on time"}</span></> : <span className="muted">sched {c(f.sched_min)}</span>}</td>
-                <td className="num">{a ? <>{a.metrics.delay_min} min{dDelay != null && <span className={`sub ${dDelay > 0 ? "neg" : dDelay < 0 ? "pos" : ""}`}>{signed(dDelay, " min")} vs status quo</span>}</> : <span className="muted">—</span>}</td>
-                <td className="num">{a ? <>{a.metrics.pax_total ? `${a.metrics.pax_protected} of ${a.metrics.pax_total}` : <span className="muted">no connections</span>}{dPax != null && a.metrics.pax_total > 0 && <span className={`sub ${dPax < 0 ? "neg" : dPax > 0 ? "pos" : ""}`}>{signed(dPax)} vs status quo</span>}</> : <span className="muted">—</span>}</td>
+                <td className="num">{a ? <>{a.metrics.delay_min} min{dDelay != null && <span className={`sub ${dDelay > 0 ? "neg" : dDelay < 0 ? "pos" : ""}`}>{signed(dDelay, " min")} vs status quo</span>}</> : <span className="muted">n/a</span>}</td>
+                <td className="num">{a ? <>{a.metrics.pax_total ? `${a.metrics.pax_protected} of ${a.metrics.pax_total}` : <span className="muted">no connections</span>}{dPax != null && a.metrics.pax_total > 0 && <span className={`sub ${dPax < 0 ? "neg" : dPax > 0 ? "pos" : ""}`}>{signed(dPax)} vs status quo</span>}</> : <span className="muted">n/a</span>}</td>
               </tr>
             );
           })}
@@ -113,7 +113,7 @@ export function Checks({ wave, ev, base }: { wave: WaveScenario; ev: PlanEvaluat
                           {c ? (
                             <button className={`cell${c.passed ? "" : " fail"}`} aria-pressed={on} onClick={() => setSel({ rule: r.id, cs: f.callsign })}
                               aria-label={`${r.name} for ${f.callsign}: ${c.passed ? "pass" : "fail"}`}>{c.passed ? "Pass" : "Fail"}</button>
-                          ) : <span className="muted">—</span>}
+                          ) : <span className="muted">n/a</span>}
                         </td>
                       );
                     })}
