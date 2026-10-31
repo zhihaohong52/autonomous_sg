@@ -245,6 +245,19 @@ Run: `python3 -m atm.wave.benchmark --source flights2015 --n 50 --arms openroute
 - Full report: `eval/BENCHMARK.md`, raw data `eval/benchmark.json`.
 <!-- /BENCHMARK -->
 
+### Cost of model calls
+
+Measured on 31 Oct 2026 from the OpenRouter key's usage counter before and after 20 random live flights.csv waves in decision mode (jev-1.14): **191 model calls for $0.0097**, so about **$0.00005 per call and $0.0005 per wave** (9.6 calls per wave: one triage, the move picks and the votes).
+
+| Item | Per wave | Per 1,000 waves | Source |
+|---|---|---|---|
+| jev-1.14 decisions (OpenRouter) | ~$0.0005 | ~$0.50 | measured, as above |
+| Claude Haiku 5.5 brief (one call, max 1,500 output tokens) | at most ~$0.0016 | at most ~$1.60 | Anthropic list price $0.10 / $0.50 per million input / output tokens; upper bound assuming 8k input tokens and the full output cap |
+| Formulas mode | $0 | $0 | no model calls |
+| **Total, decision mode with brief** | **about $0.002** | **about $2** | |
+
+For scale: everything this key spent during the hackathon, including every benchmark arm, the 1,000-row and 100-row runs and the outage tests, came to about $6. Replays cost nothing (no model calls).
+
 ### Demo replays
 
 Recorded runs in `data/replay/` (live jev-1.14) play back with no model calls. Waves without a recording run live.

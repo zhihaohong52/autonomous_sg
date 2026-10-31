@@ -105,3 +105,6 @@ We follow TypeSafe's confidence routing: a model vote counts only when confident
 **Is the delay result significant?**
 At n = 50 the 95% intervals are about ±47 min, so the delay differences between arms are not significant; at 1,000 rows jev-1.14 and the formulas are 329.8 vs 329.3 ± 10.6 min with the same outcome on every wave. The claims we make are about legality (0 violations vs 16/50 for the status quo), consensus and robustness, which hold at both sizes.
 
+**What does it cost to run?**
+About $0.002 per disruption in decision mode: jev-1.14 decisions measured at $0.0005 per wave (about 10 calls at $0.00005 each) plus at most about $0.0016 for the Claude Haiku 5.5 brief. That is roughly $2 per 1,000 disruptions; formulas mode is free. The whole hackathon, every benchmark included, cost about $6 in model calls.
+
