@@ -224,3 +224,5 @@ td .sub { display: block; font-size: var(--fs-small); color: var(--muted); line-
   .log-host { position: static; }
   .log-host .log { max-height: 520px; }
 }
+/* inside a card the empty state is a quiet sentence, not a second box */
+.card .empty { border: 0; padding: 0; font-size: 13px; }
