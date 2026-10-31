@@ -1,0 +1,15 @@
+.git
+.env
+.env.*
+.cache
+__pycache__
+*.pyc
+node_modules
+frontend/node_modules
+frontend/dist
+data/challenge1
+data/challenge5
+eval/decisions.jsonl
+scripts/
+tests/
+docs/

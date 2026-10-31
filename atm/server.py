@@ -95,6 +95,13 @@ def eval_results():
 app.mount("/static", StaticFiles(directory=WEB), name="static")
 
 
-@app.get("/")
-def index():
-    return FileResponse(WEB / "index.html")
+FRONTEND_DIST = ROOT / "frontend" / "dist"
+
+if (FRONTEND_DIST / "index.html").exists():
+    # Built React frontend takes over "/" (mounted last so all /api routes keep precedence).
+    app.mount("/", StaticFiles(directory=FRONTEND_DIST, html=True), name="frontend")
+else:
+
+    @app.get("/")
+    def index():
+        return FileResponse(WEB / "index.html")

@@ -1,0 +1,54 @@
+name: Deploy to Hugging Face Space
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+          fetch-depth: 0
+
+      - name: Prepare Space working copy
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@users.noreply.github.com"
+          # Fresh orphan branch: HF rejects history containing large non-LFS blobs.
+          git checkout --orphan space-deploy
+          # HF front matter + original README
+          cat scripts/space_readme_header.md README.md > README.md.new
+          mv README.md.new README.md
+          # Drop files the Space doesn't need, from the index and the working tree
+          git rm -r -q --cached --ignore-unmatch docs tests scripts data/challenge3 data/challenge4 CHALLENGES.md
+          rm -rf docs tests scripts data/challenge3 data/challenge4 CHALLENGES.md
+          # Git LFS for binary assets and any file over 10 MB
+          sudo apt-get update -qq && sudo apt-get install -y -qq git-lfs
+          git lfs install --local
+          big=$(find . -type f -size +10M -not -path './.git/*' | sed 's|^\./||')
+          if [ -n "$big" ]; then
+            bad=$(echo "$big" | grep -v '^data/' || true)
+            if [ -n "$bad" ]; then
+              echo "::error::Files > 10 MB outside data/ cannot be pushed to the Space:"
+              echo "$bad"
+              exit 1
+            fi
+          fi
+          git lfs track "*.gz" "*.zip" "*.parquet" "*.png" "*.jpg" "*.jpeg" "*.gif" "*.ico" "*.webp" "*.woff" "*.woff2" "*.ttf" "*.pdf" "*.xlsx"
+          if [ -n "$big" ]; then
+            echo "$big" | while read -r f; do git lfs track "$f"; done
+          fi
+          # Re-stage everything so the LFS clean filter applies to every file, including .gitattributes
+          git rm -r -q --cached .
+          git add -A
+          git commit -q -m "Deploy to Space"
+
+      - name: Push to Hugging Face
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          git push --force "https://james77mill:${HF_TOKEN}@huggingface.co/spaces/james77mill/disruption-negotiator" HEAD:main
