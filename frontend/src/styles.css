@@ -266,3 +266,6 @@ td .sub { font-size: 13px; }
 .airport-map .rose-value { font: 500 15px var(--font); fill: var(--text); }
 @media (max-width: 1100px) { .map-row { grid-template-columns: 1fr; } }
 @media (max-width: 1100px) and (min-width: 761px) { .settings .menu, .settings .menu.wide { left: auto; right: 0; } .settings { position: static; } .toolbar { position: relative; } }
+
+.search-trigger { min-width: 280px; color: var(--muted); cursor: text; list-style: none; background-image: none; }
+.search-trigger::-webkit-details-marker { display: none; }

@@ -350,6 +350,14 @@ function finding(wave: WaveScenario | null, status: Status, msgs: NegotiationMes
 }
 
 /* Pick the challenge input: one row of flights.csv becomes the wave's disruption flight. */
+const HARD_CASES = [
+  { id: "F2015-6291", title: "ORD, every runway closed", what: "no legal landing: solver diverts to MDW" },
+  { id: "F2015-70412", title: "PHX, every runway closed", what: "no legal landing: solver diverts to TUS" },
+  { id: "F2015-252123", title: "LGA, runway closed, 5 queued", what: "agreement only in turn 3" },
+  { id: "F2015-247837", title: "SLC, 3 of 6 runways closed", what: "agreement only in turn 3" },
+  { id: "F2015-102056", title: "DL2019, nothing passes the rules", what: "solver safety net" },
+];
+
 function FlightPicker({ airport, onPick }: { airport: string; onPick: (waveId: string) => void }) {
   const [q, setQ] = useState("");
   const [rows, setRows] = useState<FlightRow[] | null>(null);
@@ -363,11 +371,23 @@ function FlightPicker({ airport, onPick }: { airport: string; onPick: (waveId: s
   }, [q, airport]);
   return (
     <details className="settings" ref={ref}>
-      <summary className="btn text"><span className="lbl">Flight from flights.csv</span></summary>
+      <summary className="select search-trigger" aria-label="Search all flights.csv rows">Search any flight, airport or row…</summary>
       <div className="menu wide">
         <label className="field">Search by flight, airport or row
-          <input className="select" style={{ backgroundImage: "none", cursor: "text" }} value={q} onChange={(e) => setQ(e.target.value)} placeholder={`For example AA1298, or ${airport}`} />
+          <input autoFocus className="select" style={{ backgroundImage: "none", cursor: "text" }} value={q} onChange={(e) => setQ(e.target.value)} placeholder={`For example AA1298, or ${airport}`} />
         </label>
+        {!q && (
+          <div className="picklist" role="list" aria-label="Hard scenarios">
+            <p className="muted" style={{ fontSize: 13 }}>Hard scenarios</p>
+            {HARD_CASES.map((h) => (
+              <button key={h.id} role="listitem" onClick={() => { ref.current?.removeAttribute("open"); onPick(h.id); }}>
+                <span><span className="code">{h.id}</span> {h.title}</span>
+                <span className="muted">{h.what}</span>
+              </button>
+            ))}
+            <p className="muted" style={{ fontSize: 13 }}>Flights at {airport}</p>
+          </div>
+        )}
         <div className="picklist" role="list">
           {rows == null ? <p className="muted">Loading…</p> : !rows.length ? <p className="muted">No flights match.</p> : rows.map((r) => (
             <button key={r.row_id} role="listitem" onClick={() => { ref.current?.removeAttribute("open"); onPick(r.wave_id); }}>
